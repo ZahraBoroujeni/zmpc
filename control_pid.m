@@ -2,8 +2,9 @@ function vehicle = control_pid(vehicle, Ftarget)
 kp = 9.55;
 kd = 2.743;
 kd2 = 1;
-ki = 4.775;
-wn = 18; zeta = 1;
+ki = 4.775*0;
+wn = vehicle.control_pid.theta_cmd_wn;
+zeta = vehicle.control_pid.theta_cmd_z;
 
 thetamax = 15*pi/180;
 thetamin = -thetamax;
@@ -36,7 +37,7 @@ vehicle.control_pid.Mycmd = kp * err + ...
         - kd2 * q ...
         + ki * vehicle.control_pid.theta_errI;
 
-vehicle.U = pinv(vehicle.lcm) * [0 ; Fzcmd ;  vehicle.control_pid.Mycmd];
+vehicle.U = control_mix(vehicle, [Fzcmd ;  vehicle.control_pid.Mycmd]);
 %vehicle.U = min(max(vehicle.U,vehicle.tmin),vehicle.tmax);
 
 %backsolving ...
