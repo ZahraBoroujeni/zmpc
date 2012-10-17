@@ -33,14 +33,17 @@ vehicle.control_pid.theta_cmd_rate = 0;
 vehicle.control_pid.theta_errI = 0; %integrated error 
 
 vehicle.control_lqru = vehicle.control_pid;
+%this is to handle the fact that we are doing tracking instead of
+%regulating
+vehicle.control_lqru.BinvIA = pinv(vehicle.sysdMy.B)*(eye(size(vehicle.sysdMy.A)) - vehicle.sysdMy.A);
 vehicle.control_lqru.Q = diag([1 .01]);
 vehicle.control_lqru.R = .01;
-vehicle.control_lqru.K = dlqr(vehicle.sysdMy.A,vehicle.sysdMy.B,...
+%vehicle.control_lqru.K = dlqr(vehicle.sysdMy.A,vehicle.sysdMy.B,...
+ %                            vehicle.control_lqru.Q, vehicle.control_lqru.R);
+
+%Testing finite horizon lqr...
+vehicle.control_lqru.K = lqr_finite(vehicle.sysdMy.A,vehicle.sysdMy.B,300,...
                              vehicle.control_lqru.Q, vehicle.control_lqru.R);
-vehicle.control_lqru.BinvIA = pinv(vehicle.sysdMy.B)*(eye(size(vehicle.sysdMy.A)) - vehicle.sysdMy.A);
-
-
-vehicle.control_lqrfu = vehicle.control_lqrfu;
 
 %control mix weight on Fz_err and My_err
 vehicle.ctrlmix_W = [1 0; 0 1000];

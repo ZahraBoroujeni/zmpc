@@ -1,11 +1,12 @@
 
 tic;
 qzVehicle;
+toc;
 cvx_solver sedumi;
 cvx_quiet(true);
 
-%controller_type = 'lqru';
-controller_type = 'pid';
+controller_type = 'lqru';
+%controller_type = 'pid';
 
 
 Tmax = 3;
@@ -18,8 +19,8 @@ Mycmd = zeros(1,n);
 thetaCmd = Mycmd;
 
 %target Fx Fz
-Ftarget = [15; -1.2*vehicle.weight];
-%Ftarget = [3; -1*vehicle.weight];
+%Ftarget = [15; -1.2*vehicle.weight];
+Ftarget = [3; -1*vehicle.weight];
 
 %initial attitude
 vehicle.x = [5*pi/180 ; -1*pi/180];

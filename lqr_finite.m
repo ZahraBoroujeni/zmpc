@@ -51,7 +51,7 @@ Su = sparse(Su);
 H = Su'*Qbar*Su + Rbar;
 Ft = Su'*Qbar*Sx;
 
-%oops
+%using A\b instead of inv(A)
 K = H\Ft;
 K = full(K(1:m,:));
 end
