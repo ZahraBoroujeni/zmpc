@@ -49,4 +49,7 @@ vehicle.control_lqru.K = lqr_finite(vehicle.sysdMy.A,vehicle.sysdMy.B,300,...
 vehicle.ctrlmix_W = [1 0; 0 1000];
 
 
+vehicle.control_cvx.solved = false;
+vehicle.control_cvx.Ftarget = [0; 0];
+
 

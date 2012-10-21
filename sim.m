@@ -1,12 +1,21 @@
+ctrl = {'lqru', 'pid', 'mpc'};
+
+%controller_type = 'lqru';
+%controller_type = 'pid'; 
+%controller_type = 'mpc'; 
+
+
+for i = 3
+    
+controller_type = ctrl{i};
 
 tic;
+clear vehicle;
 qzVehicle;
 toc;
 cvx_solver sedumi;
-cvx_quiet(true);
+cvx_quiet(true); 
 
-controller_type = 'lqru';
-%controller_type = 'pid';
 
 
 Tmax = 3;
@@ -19,21 +28,28 @@ Mycmd = zeros(1,n);
 thetaCmd = Mycmd;
 
 %target Fx Fz
-%Ftarget = [15; -1.2*vehicle.weight];
-Ftarget = [3; -1*vehicle.weight];
+Ftarget = [15; -1.2*vehicle.weight];
+%Ftarget = [3; -1*vehicle.weight];
 
 %initial attitude
 vehicle.x = [5*pi/180 ; -1*pi/180];
 
 X(:,1) = vehicle.x;
 FM(:,1) = vehicle.FM;
+
+
 for i = 1:n-1
     switch controller_type
+        case 'mpc' 
+            vehicle = control_cvx(vehicle,Ftarget);
+            Mycmd(:,i) = 0;
+            thetaCmd(:,i) = 0;
+            
         case 'pid'
             vehicle = control_pid(vehicle,Ftarget);
             Mycmd(:,i) = vehicle.control_pid.Mycmd;
             thetaCmd(:,i) = vehicle.control_pid.theta_cmd;
-
+            
         case 'lqru'
             vehicle = control_lqru(vehicle,Ftarget);
             Mycmd(:,i) = vehicle.control_lqru.Mycmd;
@@ -82,3 +98,6 @@ plot(t,My, t, Mycmd);
 ylim([-3 3]); grid on;
 xlabel('time'); ylabel('My');
 toc;
+
+
+end
