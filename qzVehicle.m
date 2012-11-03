@@ -20,9 +20,10 @@ vehicle.x = [0; 0]; %theta , theta_dot
 vehicle.A = [0 1; 0 0];
 vehicle.B = [zeros(1,4) ; vehicle.lcm(3,:) / vehicle.Iyy];
 vehicle.sysd = c2d(ss(vehicle.A,vehicle.B,[],[]),vehicle.dt);
+vehicle.Mydist = 1 ;
 
 %same as above but bunching actuators as My
-vehicle.BMy = [ 0 ; 1];
+vehicle.BMy = [ 0 ; 1/vehicle.Iyy];
 vehicle.sysdMy = c2d(ss(vehicle.A,vehicle.BMy,[],[]),vehicle.dt);
 
 %command and command rate for filter
@@ -51,5 +52,18 @@ vehicle.ctrlmix_W = [1 0; 0 1000];
 
 vehicle.control_cvx.solved = false;
 vehicle.control_cvx.Ftarget = [0; 0];
+
+
+vehicle.estimator_dist.Myd = 0; 
+vehicle.estimator_dist.xd = [vehicle.x ;vehicle.estimator_dist.Myd]; %theta, theta_dot, Myd
+
+vehicle.estimator_dist.A = [vehicle.sysdMy.A , vehicle.sysdMy.B; zeros(1,2) , 1];
+vehicle.estimator_dist.B = [vehicle.sysdMy.B ; 0];
+
+vehicle.estimator_dist.Cxd = [eye(2) , zeros(2,1)];
+vehicle.estimator_dist.Lxd = -[1 0; 
+                              0 1;
+                              0 5];
+
 
 

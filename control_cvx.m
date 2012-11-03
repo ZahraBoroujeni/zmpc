@@ -1,12 +1,16 @@
-function vehicle = control_cvx(vehicle, Ftarget)
+function vehicle = control_cvx(vehicle, Ftarget_in)
 
 
-if((~vehicle.control_cvx.solved) || any(Ftarget ~= vehicle.control_cvx.Ftarget))
-    
+if(1 || (~vehicle.control_cvx.solved) || any(Ftarget_in ~= vehicle.control_cvx.Ftarget))
+
+    Ftarget = Ftarget_in;
+    theta_Fx = asind(Ftarget(1)/vehicle.weight);
+    theta_Fx = max(min(theta_Fx,15),-15);
+    Ftarget(1) = sind(theta_Fx)*vehicle.weight;
     %x = Ax * Bu where x = [theta, theta_dot]
     %y = [Fx; delta_Fz] = [-W*theta ; ]
     %y = [-W , 0] * x + [-1 -1 -1 -1] * u
-    N = 300;
+    N = 100;
     n = 4;
     Ftrim = [0 ; -vehicle.weight];
     utrim =  vehicle.weight / 4;
@@ -29,13 +33,18 @@ if((~vehicle.control_cvx.solved) || any(Ftarget ~= vehicle.control_cvx.Ftarget))
     
     
     cvx_begin
-    cvx_quiet(false)
     variable xu(2*N + n*N);
     
     minimize transpose(xu)*Abar*xu + cbart*xu;
     subject to 
         xu(1) == vehicle.x(1);
         xu(2) == vehicle.x(2);
+%         xu((N-1)*(2+n)+1) >= -15*pi/180;
+%         xu((N-1)*(2+n)+1) <= 15*pi/180;
+%         
+%         xu((N-1)*(2+n)+2) >= -1*pi/180;
+%         xu((N-1)*(2+n)+2) <= 1*pi/180;
+        
         for i = 1:N-1
             xi = (i-1)*(2+n)+1;
             xidx = xi:(xi+1);
@@ -43,18 +52,16 @@ if((~vehicle.control_cvx.solved) || any(Ftarget ~= vehicle.control_cvx.Ftarget))
             ui = xi+2; 
             uidx = ui:(ui+n-1);
             %X(k+1) = A*x + B*u
-            xu(xidxp1) == vehicle.sysd.a * xu(xidx) + vehicle.sysd.b * xu(uidx);
+            xu(xidxp1) == vehicle.sysd.a * xu(xidx) + vehicle.sysd.b * xu(uidx) + vehicle.sysdMy.b * vehicle.estimator_dist.Myd;
             %max thrust
             xu(uidx) >= -utrim;
             xu(uidx) <= vehicle.tmax-utrim;
             %restrict attitude
-            xu(xidxp1(1)) >= -15*pi/180;
-            xu(xidxp1(1)) <= 15*pi/180;
-        end
-    tic;
-    
+%             
+%             xu(xidxp1(1)) >= -60*pi/180;
+%             xu(xidxp1(1)) <= 60*pi/180;
+        end    
     cvx_end
-   toc;
     x_u = reshape(xu,2+n,N);
     Utrim =utrim * ones(n,1);
     vehicle.control_cvx.u = x_u(3:end,:);
@@ -63,10 +70,12 @@ if((~vehicle.control_cvx.solved) || any(Ftarget ~= vehicle.control_cvx.Ftarget))
     vehicle.control_cvx.F = C* vehicle.control_cvx.x + D * vehicle.control_cvx.u + repmat(Ftrim,1,N);
     vehicle.control_cvx.iter = 0;
     vehicle.control_cvx.solved = true;
-    vehicle.control_cvx.Ftarget = Ftarget;
+    vehicle.control_cvx.Ftarget = Ftarget_in;
 end
 
 vehicle.control_cvx.iter = vehicle.control_cvx.iter + 1;
-vehicle.U = vehicle.control_cvx.Uff(:,vehicle.control_cvx.iter);
+if(vehicle.control_cvx.iter <= size(vehicle.control_cvx.Uff,2))
+    vehicle.U = vehicle.control_cvx.Uff(:,vehicle.control_cvx.iter);
+end
 
 end

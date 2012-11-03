@@ -3,6 +3,7 @@ kp = 9.55;
 kd = 2.743;
 kd2 = 1;
 ki = 4.775*0;
+kdist = 1;
 wn = vehicle.control_pid.theta_cmd_wn;
 zeta = vehicle.control_pid.theta_cmd_z;
 
@@ -35,7 +36,8 @@ vehicle.control_pid.theta_errI = vehicle.control_pid.theta_errI + err*vehicle.dt
 vehicle.control_pid.Mycmd = kp * err + ...
         kd * (vehicle.control_pid.theta_cmd_rate - q) ...
         - kd2 * q ...
-        + ki * vehicle.control_pid.theta_errI;
+        + ki * vehicle.control_pid.theta_errI ...
+        - kdist * vehicle.estimator_dist.Myd;
 
 vehicle.U = control_mix(vehicle, [Fzcmd ;  vehicle.control_pid.Mycmd]);
 %vehicle.U = min(max(vehicle.U,vehicle.tmin),vehicle.tmax);
