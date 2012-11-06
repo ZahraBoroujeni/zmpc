@@ -1,11 +1,11 @@
-ctrl = {'lqru', 'pid', 'mpc'};
+ctrl = {'lqru', 'pid', 'mpc', 'mpc2'};
 
 %controller_type = 'lqru';
 %controller_type = 'pid'; 
 %controller_type = 'mpc'; 
 
 
-for i = 3
+for i = 4
     
 controller_type = ctrl{i};
 
@@ -37,7 +37,7 @@ Ftarget = [3; -1*vehicle.weight];
 %initial attitude
 vehicle.x = [5*pi/180 ; -1*pi/180];
 %intialize disturbance estimator
-vehicle.estimator_dist.xd = [vehicle.x ; 0];
+vehicle.estimator_dist.xd = [vehicle.x ; 1];
 
 X(:,1) = vehicle.x;
 FM(:,1) = vehicle.FM;
@@ -46,6 +46,11 @@ Xest(:,1) = X(:,1);
 
 for i = 1:n-1
     switch controller_type
+        case 'mpc2'
+            vehicle = control_cvx_noineq(vehicle,Ftarget);
+            Mycmd(:,i) = 0;
+            thetaCmd(:,i) = 0;
+            
         case 'mpc' 
             vehicle = control_cvx(vehicle,Ftarget);
             Mycmd(:,i) = 0;

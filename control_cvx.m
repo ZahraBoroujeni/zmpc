@@ -1,7 +1,7 @@
 function vehicle = control_cvx(vehicle, Ftarget_in)
 
 
-if(1 || (~vehicle.control_cvx.solved) || any(Ftarget_in ~= vehicle.control_cvx.Ftarget))
+if(0 || (~vehicle.control_cvx.solved) || any(Ftarget_in ~= vehicle.control_cvx.Ftarget))
 
     Ftarget = Ftarget_in;
     theta_Fx = asind(Ftarget(1)/vehicle.weight);
