@@ -3,11 +3,8 @@ function vehicle = control_cvx_noineq(vehicle, Ftarget_in)
 %x = Ax * Bu where x = [theta, theta_dot]
 %y = [Fx; delta_Fz] = [-W*theta ; ]
 %y = [-W , 0] * x + [-1 -1 -1 -1] * u
-N = 300;
+N = 100;
 n = 4;
-Ftrim = [0 ; -vehicle.weight];
-utrim =  vehicle.weight / 4;
-
 
 Ftarget = Ftarget_in;
 theta_Fx = asind(Ftarget(1)/vehicle.weight);
@@ -25,8 +22,6 @@ D = [0 0 0 0 ; -1 -1 -1 -1];
 if(~isfield(vehicle.control_cvx,'H'))
    %build the H matrix 
 
-    
-    
     A = vehicle.sysd.a ;
     B = vehicle.sysd.b ;
     
@@ -37,6 +32,7 @@ if(~isfield(vehicle.control_cvx,'H'))
     Bbar = blkdiag(zeros(size(B)),Bbar,zeros(size(B)));
     Bbar = Bbar(1:end-size(B,1),size(B,2)+1:end);
     
+    Bbar = [Bbar ; zeros(size(B,1),size(Bbar,2))];
 
     
     Abar = repmat({-A},1,N-1);
@@ -44,17 +40,20 @@ if(~isfield(vehicle.control_cvx,'H'))
     Abar = blkdiag(zeros(size(A)),Abar,zeros(size(A)));
     Abar = Abar(1:end-size(A,1),size(A,2)+1:end);
     Abar = eye(N*size(A)) + Abar;
-        
+    Abar = [Abar ; ...
+                 [zeros(size(A,1),size(Abar,2)-2*size(A,2)) , -eye(size(A)), eye(size(A)) ] ] ;
+    
+    
     Abarinv = pinv(Abar);
     Fbar = Abarinv*Bbar;
     
     Qxx = C'*Qx*C ;
-    Quu = D'*Qx*D + R;
     Qxu = C'*Qx*D;
+    Quu = D'*Qx*D + R;
     
-    Pxx = 10*Qxx;
-    Pxu = 10*Qxu;
-    Puu = 10*D'*Qx*D + R;
+    Pxx = Qxx;
+    Pxu = Qxu;
+    Puu = D'*Qx*D + R;
     
     Qxbar = repmat({Qxx},1,N-1);
     Qxbar = blkdiag(Qxbar{:},Pxx);
@@ -75,17 +74,17 @@ if(~isfield(vehicle.control_cvx,'H'))
     vehicle.control_cvx.Fbar = Fbar;
     
     vehicle.control_cvx.usol = zeros(n*N,1);
-    toc;
+    vehicle.control_cvx.iter = 0;
 end
 
 
 if(0 || (~vehicle.control_cvx.solved) || any(Ftarget_in ~= vehicle.control_cvx.Ftarget))
 
-bMyd = vehicle.sysdMy.b * 1;% vehicle.estimator_dist.Myd;
-bbar = [vehicle.x ; repmat(bMyd, N-1,1)];
+bMyd = vehicle.sysdMy.b *  vehicle.estimator_dist.Myd;
+bbar = [vehicle.x ; repmat(bMyd, N-1,1); 0*vehicle.x];
 
 
-fd = Ftarget - Ftrim;
+fd = Ftarget;
 cx = -2*C'*Qx * fd;
 cu = -2*D'*Qx * fd;
     
@@ -119,10 +118,10 @@ CUbart = 2*dbart*(vehicle.control_cvx.Qxbar * vehicle.control_cvx.Fbar - vehicle
 %     point in PROBLEM.x0
 problem.H = (vehicle.control_cvx.H+vehicle.control_cvx.H');
 problem.f = CUbart';
-problem.lb = -utrim * ones(N*n,1);
-problem.ub = (vehicle.tmax-utrim)*ones(N*n,1);
+problem.lb = zeros(N*n,1);
+problem.ub = (vehicle.tmax)*ones(N*n,1);
 problem.solver = 'quadprog';
-problem.options = optimset('Algorithm','interior-point-convex','Display','on');
+problem.options = optimset('Algorithm','interior-point-convex','Display','off');
 %problem.options = optimset('Algorithm','trust-region-reflective','Display','off');
 % 
 %               Algorithm: [ active-set | interior-point | interior-point-convex | levenberg-marquardt | ...
@@ -137,19 +136,16 @@ problem.x0 = vehicle.control_cvx.usol;
 % [u, ~] = bvls(A,b,problem.lb,problem.ub);
 % toc
 
-tic;
 u = quadprog(problem);
-toc;
 
     u(end-3:end) = u(end-7:end-4);
     vehicle.control_cvx.usol = u;
-    Utrim =utrim * ones(n,1);
     vehicle.control_cvx.u = reshape(u,n,N);
     
-    vehicle.control_cvx.Uff = vehicle.control_cvx.u + repmat(Utrim,1,N);
+    vehicle.control_cvx.Uff = vehicle.control_cvx.u;
     x = vehicle.control_cvx.Fbar * u + dbart';
     vehicle.control_cvx.x = reshape(x,2,N);
-    vehicle.control_cvx.F = C* vehicle.control_cvx.x + D * vehicle.control_cvx.u + repmat(Ftrim,1,N);
+    vehicle.control_cvx.F = C* vehicle.control_cvx.x + D * vehicle.control_cvx.u;
     vehicle.control_cvx.Ftarget = Ftarget_in;
 
         vehicle.control_cvx.iter = 0;
@@ -158,7 +154,7 @@ end
 
 
 vehicle.control_cvx.iter = vehicle.control_cvx.iter + 1;
-if(vehicle.control_cvx.iter <= size(vehicle.control_cvx.Uff,2))
+if(vehicle.control_cvx.iter < size(vehicle.control_cvx.Uff,2))
     vehicle.U = vehicle.control_cvx.Uff(:,vehicle.control_cvx.iter);
 end
 

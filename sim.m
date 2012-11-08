@@ -37,7 +37,8 @@ Ftarget = [3; -1*vehicle.weight];
 %initial attitude
 vehicle.x = [5*pi/180 ; -1*pi/180];
 %intialize disturbance estimator
-vehicle.estimator_dist.xd = [vehicle.x ; 1];
+vehicle.estimator_dist.xd = [vehicle.x ; 0];
+%vehicle.estimator_dist.Myd = 1;
 
 X(:,1) = vehicle.x;
 FM(:,1) = vehicle.FM;

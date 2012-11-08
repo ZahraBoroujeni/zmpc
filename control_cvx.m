@@ -60,8 +60,8 @@ if(0 || (~vehicle.control_cvx.solved) || any(Ftarget_in ~= vehicle.control_cvx.F
 %             xu(xidxp1(1)) <= 60*pi/180;
         end
 %         x(N) = A*x(N) + B*u(N-1) + dist;
-
-        xu(xidxp1) == vehicle.sysd.a * xu(xidxp1) + vehicle.sysd.b * xu(uidx) + vehicle.sysdMy.b * vehicle.estimator_dist.Myd;
+%         a.k.a x(N) = x(N-1)
+          xu(xidxp1) == xu(xidx) ;
     cvx_end
     x_u = reshape(xu,2+n,N);
     vehicle.control_cvx.u = x_u(3:end,:);
