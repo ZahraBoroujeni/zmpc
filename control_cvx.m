@@ -12,8 +12,6 @@ if(0 || (~vehicle.control_cvx.solved) || any(Ftarget_in ~= vehicle.control_cvx.F
     %y = [-W , 0] * x + [-1 -1 -1 -1] * u
     N = 100;
     n = 4;
-    Ftrim = [0 ; -vehicle.weight];
-    utrim =  vehicle.weight / 4;
     
     Q = diag([1 10]);
     r = 0.1;
@@ -23,8 +21,8 @@ if(0 || (~vehicle.control_cvx.solved) || any(Ftarget_in ~= vehicle.control_cvx.F
     D = [0 0 0 0 ; -1 -1 -1 -1];
     
     A = [C'*Q*C , -C'*Q*D ; -D'*Q*C , D'*Q*D + R];
-    fd = Ftarget - Ftrim;
-    c = -2*[C'*Q; D'*Q] * fd;
+    yd = Ftarget;
+    c = -2*[C'*Q; D'*Q] * yd;
     
     Abar = repmat({A},1,N);
     Abar = blkdiag(Abar{:});
@@ -54,27 +52,29 @@ if(0 || (~vehicle.control_cvx.solved) || any(Ftarget_in ~= vehicle.control_cvx.F
             %X(k+1) = A*x + B*u
             xu(xidxp1) == vehicle.sysd.a * xu(xidx) + vehicle.sysd.b * xu(uidx) + vehicle.sysdMy.b * vehicle.estimator_dist.Myd;
             %max thrust
-            xu(uidx) >= -utrim;
-            xu(uidx) <= vehicle.tmax-utrim;
+            xu(uidx) >= 0;
+            xu(uidx) <= vehicle.tmax;
             %restrict attitude
 %             
 %             xu(xidxp1(1)) >= -60*pi/180;
 %             xu(xidxp1(1)) <= 60*pi/180;
-        end    
+        end
+%         x(N) = A*x(N) + B*u(N-1) + dist;
+
+        xu(xidxp1) == vehicle.sysd.a * xu(xidxp1) + vehicle.sysd.b * xu(uidx) + vehicle.sysdMy.b * vehicle.estimator_dist.Myd;
     cvx_end
     x_u = reshape(xu,2+n,N);
-    Utrim =utrim * ones(n,1);
     vehicle.control_cvx.u = x_u(3:end,:);
     vehicle.control_cvx.x = x_u(1:2,:);
-    vehicle.control_cvx.Uff = vehicle.control_cvx.u + repmat(Utrim,1,N);
-    vehicle.control_cvx.F = C* vehicle.control_cvx.x + D * vehicle.control_cvx.u + repmat(Ftrim,1,N);
+    vehicle.control_cvx.Uff = vehicle.control_cvx.u ;
+    vehicle.control_cvx.F = C* vehicle.control_cvx.x + D * vehicle.control_cvx.u;
     vehicle.control_cvx.iter = 0;
     vehicle.control_cvx.solved = true;
     vehicle.control_cvx.Ftarget = Ftarget_in;
 end
 
 vehicle.control_cvx.iter = vehicle.control_cvx.iter + 1;
-if(vehicle.control_cvx.iter <= size(vehicle.control_cvx.Uff,2))
+if(vehicle.control_cvx.iter < size(vehicle.control_cvx.Uff,2))
     vehicle.U = vehicle.control_cvx.Uff(:,vehicle.control_cvx.iter);
 end
 
