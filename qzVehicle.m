@@ -54,6 +54,7 @@ vehicle.control_cvx.solved = false;
 vehicle.control_cvx.Ftarget = [0; 0];
 
 
+%Estimator settings
 vehicle.estimator_dist.Myd = 0; 
 vehicle.estimator_dist.xd = [vehicle.x ;vehicle.estimator_dist.Myd]; %theta, theta_dot, Myd
 
@@ -66,4 +67,19 @@ vehicle.estimator_dist.Lxd = -[1 0;
                               0 5];
 
 
+%Motor dynamics:
+M_omega1 = 22/1.4;
+M_omega2 = 60*2*pi;
+motor_dynamics = tf(1/( (s/M_omega1) + 1) /( (s/M_omega2) + 1));
+motor_dynamics = ss(motor_dynamics);
+z = tf('z',.01);
+vehicle.actD.sysd = c2d(motor_dynamics,.01) * ss(1/(z^2)); %.02 time delay;
+vehicle.actD.sysd = append(vehicle.actD.sysd,vehicle.actD.sysd,vehicle.actD.sysd,vehicle.actD.sysd);
+vehicle.actD.tstates = zeros(size(vehicle.actD.sysd.a,1),1);
+
+%converge the actuator to trim state initially!
+tin = vehicle.weight/4 * ones(4,1);
+for i = 1:100
+    vehicle.actD.tstates = vehicle.actD.sysd.a * vehicle.actD.tstates + vehicle.actD.sysd.b * tin;
+end
 

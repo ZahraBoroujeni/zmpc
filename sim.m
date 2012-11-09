@@ -5,6 +5,7 @@ ctrl = {'lqru', 'pid', 'mpc', 'mpc2'};
 %controller_type = 'mpc'; 
 
 
+
 for i = 4
     
 controller_type = ctrl{i};
@@ -31,8 +32,8 @@ Mydist = Mycmd;
 Xest = X;
 
 %target Fx Fz
-Ftarget = [15; -1.2*vehicle.weight];
-%Ftarget = [3; -1*vehicle.weight];
+%Ftarget = [15; -1.2*vehicle.weight];
+Ftarget = [3; -1*vehicle.weight];
 
 %initial attitude
 vehicle.x = [5*pi/180 ; -1*pi/180];

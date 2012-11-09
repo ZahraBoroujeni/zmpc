@@ -12,12 +12,13 @@ theta_Fx = max(min(theta_Fx,15),-15);
 Ftarget(1) = sind(theta_Fx)*vehicle.weight;
 
 
-Qx = diag([1 10]);
-r = 0.1;
+Qx = diag([1 100]);
+r = 2;
 R = diag(r*ones(n,1));
 C = [-vehicle.weight , 0 ; 0, 0];
 D = [0 0 0 0 ; -1 -1 -1 -1];
 
+delta = 1;
 
 if(~isfield(vehicle.control_cvx,'H'))
    %build the H matrix 
@@ -27,10 +28,13 @@ if(~isfield(vehicle.control_cvx,'H'))
     
     vehicle.control_cvx.c1 = [repmat(zeros(size(A)),1,N-2) , -eye(size(A)) , eye(size(A))] ;
     
-    Bbar = repmat({B},1,N-1);
+    Bbar = repmat({B},1,N-delta);
     Bbar = blkdiag(Bbar{:});
-    Bbar = blkdiag(zeros(size(B)),Bbar,zeros(size(B)));
-    Bbar = Bbar(1:end-size(B,1),size(B,2)+1:end);
+    Z1 = zeros(size(B,1)*delta,size(Bbar,2));
+    Z3 = zeros(size(Bbar,1),size(B,2)*delta);
+    Z2 = zeros(size(Z1,1),size(Z3,2));
+    Bbar = [Z1 , Z2 ; Bbar, Z3];
+   
     
 
     
@@ -85,7 +89,7 @@ if(~isfield(vehicle.control_cvx,'H'))
 end
 
 
-if(vehicle.control_cvx.iter == 5 || (~vehicle.control_cvx.solved) || any(Ftarget_in ~= vehicle.control_cvx.Ftarget))
+if(vehicle.control_cvx.iter == 2 || (~vehicle.control_cvx.solved) || any(Ftarget_in ~= vehicle.control_cvx.Ftarget))
 
 bMyd = vehicle.sysdMy.b *  vehicle.estimator_dist.Myd;
 bbar = [vehicle.x ; repmat(bMyd, N-1,1)];

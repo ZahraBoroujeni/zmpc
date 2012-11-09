@@ -1,7 +1,8 @@
 function vehicle = dynamics(vehicle,t)
 
-t =  min(max(t,vehicle.tmin),vehicle.tmax);
-
+tin =  min(max(t,vehicle.tmin),vehicle.tmax);
+vehicle.actD.tstates = vehicle.actD.sysd.A * vehicle.actD.tstates + vehicle.actD.sysd.B * tin;
+t = vehicle.actD.sysd.C * vehicle.actD.tstates +   vehicle.actD.sysd.D * tin; 
 
 vehicle.x = vehicle.sysd.A * vehicle.x + vehicle.sysd.B * t + vehicle.sysdMy.B * vehicle.Mydist;
 
