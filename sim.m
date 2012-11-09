@@ -31,8 +31,8 @@ Mydist = Mycmd;
 Xest = X;
 
 %target Fx Fz
-%Ftarget = [15; -1.2*vehicle.weight];
-Ftarget = [3; -1*vehicle.weight];
+Ftarget = [15; -1.2*vehicle.weight];
+%Ftarget = [3; -1*vehicle.weight];
 
 %initial attitude
 vehicle.x = [5*pi/180 ; -1*pi/180];
@@ -87,6 +87,7 @@ U(:,end) = U(:,end-1);
 U = U/(vehicle.weight/size(U,1));
 thetaCmd_d = thetaCmd * 180/pi;
 theta_d = X(1,:)*180/pi;
+q_d = X(2,:)*180/pi;
 thetaEst_d = Xest(1,:)*180/pi;
 Fx = FM(1,:);
 Fz = FM(2,:);
@@ -95,9 +96,11 @@ My = FM(3,:);
 figuren(controller_type); clf;
 subplot(2,2,1);
 plot(t,theta_d,'b',t,thetaCmd_d,'b--',t,thetaEst_d,'k--');
+hold on;
+plot(t,q_d,'g--');
 ylim([-20 20]); grid on;
 xlabel('time'); ylabel('theta');
-legend('Theta','ThetaCmd','ThetaEst');
+legend('Theta','ThetaCmd','ThetaEst','q');
 
 
 subplot(2,2,2);

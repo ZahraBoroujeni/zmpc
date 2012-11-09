@@ -3,7 +3,7 @@ function vehicle = control_cvx_noineq(vehicle, Ftarget_in)
 %x = Ax * Bu where x = [theta, theta_dot]
 %y = [Fx; delta_Fz] = [-W*theta ; ]
 %y = [-W , 0] * x + [-1 -1 -1 -1] * u
-N = 100;
+N = 50;
 n = 4;
 
 Ftarget = Ftarget_in;
@@ -25,14 +25,13 @@ if(~isfield(vehicle.control_cvx,'H'))
     A = vehicle.sysd.a ;
     B = vehicle.sysd.b ;
     
-    
+    vehicle.control_cvx.c1 = [repmat(zeros(size(A)),1,N-2) , -eye(size(A)) , eye(size(A))] ;
     
     Bbar = repmat({B},1,N-1);
     Bbar = blkdiag(Bbar{:});
     Bbar = blkdiag(zeros(size(B)),Bbar,zeros(size(B)));
     Bbar = Bbar(1:end-size(B,1),size(B,2)+1:end);
     
-    Bbar = [Bbar ; zeros(size(B,1),size(Bbar,2))];
 
     
     Abar = repmat({-A},1,N-1);
@@ -40,9 +39,7 @@ if(~isfield(vehicle.control_cvx,'H'))
     Abar = blkdiag(zeros(size(A)),Abar,zeros(size(A)));
     Abar = Abar(1:end-size(A,1),size(A,2)+1:end);
     Abar = eye(N*size(A)) + Abar;
-    Abar = [Abar ; ...
-                 [zeros(size(A,1),size(Abar,2)-2*size(A,2)) , -eye(size(A)), eye(size(A)) ] ] ;
-    
+
     
     Abarinv = pinv(Abar);
     Fbar = Abarinv*Bbar;
@@ -64,7 +61,6 @@ if(~isfield(vehicle.control_cvx,'H'))
     Qxubar = repmat({Qxu},1,N-1);
     Qxubar = blkdiag(Qxubar{:},Pxu);
    
-
     
     vehicle.control_cvx.H = Qubar + Fbar'*(Qxbar*Fbar - 2*Qxubar);
     vehicle.control_cvx.Qubar = Qubar;
@@ -73,15 +69,26 @@ if(~isfield(vehicle.control_cvx,'H'))
     vehicle.control_cvx.Abarinv = Abarinv;
     vehicle.control_cvx.Fbar = Fbar;
     
+    vehicle.control_cvx.problem.H = (vehicle.control_cvx.H+vehicle.control_cvx.H');
+    vehicle.control_cvx.problem.Aeq = vehicle.control_cvx.c1 * vehicle.control_cvx.Fbar;
+    vehicle.control_cvx.problem.lb = zeros(N*n,1);
+    vehicle.control_cvx.problem.ub = (vehicle.tmax)*ones(N*n,1);
+    vehicle.control_cvx.problem.solver = 'quadprog';
+    vehicle.control_cvx.problem.options = optimset('Algorithm','interior-point-convex','Display','off');    
+%problem.options = optimset('Algorithm','trust-region-reflective','Display','off');
+% 
+%               Algorithm: [ active-set | interior-point | interior-point-convex | levenberg-marquardt | ...
+%                            sqp | trust-region-dogleg | trust-region-reflective ]
+
     vehicle.control_cvx.usol = zeros(n*N,1);
     vehicle.control_cvx.iter = 0;
 end
 
 
-if(0 || (~vehicle.control_cvx.solved) || any(Ftarget_in ~= vehicle.control_cvx.Ftarget))
+if(vehicle.control_cvx.iter == 5 || (~vehicle.control_cvx.solved) || any(Ftarget_in ~= vehicle.control_cvx.Ftarget))
 
 bMyd = vehicle.sysdMy.b *  vehicle.estimator_dist.Myd;
-bbar = [vehicle.x ; repmat(bMyd, N-1,1); 0*vehicle.x];
+bbar = [vehicle.x ; repmat(bMyd, N-1,1)];
 
 
 fd = Ftarget;
@@ -97,37 +104,19 @@ CUbart = 2*dbart*(vehicle.control_cvx.Qxbar * vehicle.control_cvx.Fbar - vehicle
          cxbart*vehicle.control_cvx.Fbar + cubart;
         
 
-    
-%      cvx_begin
-%      
-%      cvx_quiet(false);
-%      variable u(n*N);
-%      
-%      
-%      minimize transpose(u)*vehicle.control_cvx.H*u + CUbart*u;
-%      subject to
-%      u >= -utrim;
-%      u <= vehicle.tmax-utrim;
-%      cvx_end
- 
+     
 %    X = quadprog(PROBLEM) finds the minimum for PROBLEM. PROBLEM is a
 %     structure with matrix 'H' in PROBLEM.H, the vector 'f' in PROBLEM.f,
 %     the linear inequality constraints in PROBLEM.Aineq and PROBLEM.bineq,
 %     the linear equality constraints in PROBLEM.Aeq and PROBLEM.beq, the
 %     lower bounds in PROBLEM.lb, the upper bounds in PROBLEM.ub, the start
 %     point in PROBLEM.x0
-problem.H = (vehicle.control_cvx.H+vehicle.control_cvx.H');
-problem.f = CUbart';
-problem.lb = zeros(N*n,1);
-problem.ub = (vehicle.tmax)*ones(N*n,1);
-problem.solver = 'quadprog';
-problem.options = optimset('Algorithm','interior-point-convex','Display','off');
-%problem.options = optimset('Algorithm','trust-region-reflective','Display','off');
-% 
-%               Algorithm: [ active-set | interior-point | interior-point-convex | levenberg-marquardt | ...
-%                            sqp | trust-region-dogleg | trust-region-reflective ]
 
-problem.x0 = vehicle.control_cvx.usol;
+vehicle.control_cvx.problem.f = CUbart';
+vehicle.control_cvx.problem.x0 = vehicle.control_cvx.usol;
+vehicle.control_cvx.problem.Beq = -vehicle.control_cvx.c1 * dbart';
+
+u = quadprog(vehicle.control_cvx.problem);
 
 % % xHx + c'x = norm(Ax - b) = x'A'Ax -2 b'Ax +b'b ; c'=-2b'A -> c=-2*A'*b 
 % tic
@@ -136,7 +125,20 @@ problem.x0 = vehicle.control_cvx.usol;
 % [u, ~] = bvls(A,b,problem.lb,problem.ub);
 % toc
 
-u = quadprog(problem);
+% 
+%      cvx_begin
+%      
+%      cvx_quiet(false);
+%      variable u(n*N);
+%      
+%      
+%      minimize transpose(u)*problem.H*u/2 + CUbart*u;
+%      subject to
+%      u >= 0;
+%      u <= vehicle.tmax;
+%      problem.Aeq * u == problem.Beq;   
+%      cvx_end
+
 
     u(end-3:end) = u(end-7:end-4);
     vehicle.control_cvx.usol = u;
@@ -148,7 +150,7 @@ u = quadprog(problem);
     vehicle.control_cvx.F = C* vehicle.control_cvx.x + D * vehicle.control_cvx.u;
     vehicle.control_cvx.Ftarget = Ftarget_in;
 
-        vehicle.control_cvx.iter = 0;
+    vehicle.control_cvx.iter = 0;
     vehicle.control_cvx.solved = true;
 end
 
