@@ -12,21 +12,36 @@ theta_Fx = max(min(theta_Fx,15),-15);
 Ftarget(1) = sind(theta_Fx)*vehicle.weight;
 
 
-Qx = diag([1 100]);
-r = 2;
+Qy = diag([1 ; 100]);
+r = .1;
 R = diag(r*ones(n,1));
-C = [-vehicle.weight , 0 ; 0, 0];
-D = [0 0 0 0 ; -1 -1 -1 -1];
+nStates = size(vehicle.sysd.a,1) + size(vehicle.actD.sysd.a,1);
+C = zeros(2,nStates);
+C(1,1) = -vehicle.weight; %Fx = -theta*mg
+D = [0 0 0 0 ; -1 -1 -1 -1]; %Fz = -sum(ucmd) -> should be moved as part of C since thrust is now a state!?
 
 delta = 1;
 
+
+x0  = [vehicle.x; vehicle.actD.tstates];
+    
 if(~isfield(vehicle.control_cvx,'H'))
    %build the H matrix 
 
-    A = vehicle.sysd.a ;
-    B = vehicle.sysd.b ;
+    Atheta = vehicle.sysd.a ;
+    Btheta = vehicle.sysd.b ;
+    Au = vehicle.actD.sysd.a;
+    Bu = vehicle.actD.sysd.b;
+    Cu = vehicle.actD.sysd.c;
+    
+    A = [Atheta , Btheta*Cu ;
+        zeros(size(Au,1),size(Atheta,2)) , Au];
+    B = [zeros(size(Atheta,1),size(Bu,2)) ; Bu];
+    
     
     vehicle.control_cvx.c1 = [repmat(zeros(size(A)),1,N-2) , -eye(size(A)) , eye(size(A))] ;
+    
+    vehicle.control_cvx.BMy = [vehicle.sysdMy.b ; zeros(size(Au,1),1)];
     
     Bbar = repmat({B},1,N-delta);
     Bbar = blkdiag(Bbar{:});
@@ -48,13 +63,13 @@ if(~isfield(vehicle.control_cvx,'H'))
     Abarinv = pinv(Abar);
     Fbar = Abarinv*Bbar;
     
-    Qxx = C'*Qx*C ;
-    Qxu = C'*Qx*D;
-    Quu = D'*Qx*D + R;
+    Qxx = C'*Qy*C ;
+    Qxu = C'*Qy*D;
+    Quu = D'*Qy*D + R;
     
     Pxx = Qxx;
     Pxu = Qxu;
-    Puu = D'*Qx*D + R;
+    Puu = D'*Qy*D + R;
     
     Qxbar = repmat({Qxx},1,N-1);
     Qxbar = blkdiag(Qxbar{:},Pxx);
@@ -91,13 +106,14 @@ end
 
 if(vehicle.control_cvx.iter == 2 || (~vehicle.control_cvx.solved) || any(Ftarget_in ~= vehicle.control_cvx.Ftarget))
 
-bMyd = vehicle.sysdMy.b *  vehicle.estimator_dist.Myd;
-bbar = [vehicle.x ; repmat(bMyd, N-1,1)];
+    
+bMyd = vehicle.control_cvx.BMy *  vehicle.estimator_dist.Myd;
+bbar = [x0 ; repmat(bMyd, N-1,1)];
 
 
 fd = Ftarget;
-cx = -2*C'*Qx * fd;
-cu = -2*D'*Qx * fd;
+cx = -2*C'*Qy * fd;
+cu = -2*D'*Qy * fd;
     
 cxbart = repmat(cx,N,1)';
 cubart = repmat(cu,N,1)';
@@ -150,7 +166,7 @@ u = quadprog(vehicle.control_cvx.problem);
     
     vehicle.control_cvx.Uff = vehicle.control_cvx.u;
     x = vehicle.control_cvx.Fbar * u + dbart';
-    vehicle.control_cvx.x = reshape(x,2,N);
+    vehicle.control_cvx.x = reshape(x,nStates,N);
     vehicle.control_cvx.F = C* vehicle.control_cvx.x + D * vehicle.control_cvx.u;
     vehicle.control_cvx.Ftarget = Ftarget_in;
 
