@@ -5,6 +5,7 @@ function vehicle = control_cvx_noineq(vehicle, Ftarget_in)
 %y = [-W , 0] * x + [-1 -1 -1 -1] * u
 N = 50;
 n = 4;
+x0  = [vehicle.theta; vehicle.q ; vehicle.actD.tstates];
 
 Ftarget = Ftarget_in;
 theta_Fx = asind(Ftarget(1)/vehicle.weight);
@@ -12,18 +13,23 @@ theta_Fx = max(min(theta_Fx,15),-15);
 Ftarget(1) = sind(theta_Fx)*vehicle.weight;
 
 
-Qy = diag([1 ; 100]);
-r = .1;
+qq = 0;
+Qy = diag([qq; 1 ; 50]);
+Qyfinal = diag([qq; 1; 100]);
+r = 2;
 R = diag(r*ones(n,1));
 nStates = size(vehicle.sysd.a,1) + size(vehicle.actD.sysd.a,1);
-C = zeros(2,nStates);
-C(1,1) = -vehicle.weight; %Fx = -theta*mg
-D = [0 0 0 0 ; -1 -1 -1 -1]; %Fz = -sum(ucmd) -> should be moved as part of C since thrust is now a state!?
+C = zeros(3,nStates);
+C(1,2) = 1; %q = q
+C(2,1) = -vehicle.weight; %Fx = -theta*mg
+D = [zeros(1,4); 
+    zeros(1,4);
+     -cos(vehicle.theta)*ones(1,n);]; %Fz = -sum(ucmd) -> should be moved as part of C since thrust is now a state!?
 
 delta = 1;
 
 
-x0  = [vehicle.x; vehicle.actD.tstates];
+
     
 if(~isfield(vehicle.control_cvx,'H'))
    %build the H matrix 
@@ -67,7 +73,7 @@ if(~isfield(vehicle.control_cvx,'H'))
     Qxu = C'*Qy*D;
     Quu = D'*Qy*D + R;
     
-    Pxx = Qxx;
+    Pxx = C'*Qyfinal*C;
     Pxu = Qxu;
     Puu = D'*Qy*D + R;
     
@@ -93,7 +99,11 @@ if(~isfield(vehicle.control_cvx,'H'))
     vehicle.control_cvx.problem.lb = zeros(N*n,1);
     vehicle.control_cvx.problem.ub = (vehicle.tmax)*ones(N*n,1);
     vehicle.control_cvx.problem.solver = 'quadprog';
-    vehicle.control_cvx.problem.options = optimset('Algorithm','interior-point-convex','Display','off');    
+    vehicle.control_cvx.problem.options = optimset('Algorithm','interior-point-convex',...
+            'LargeScale','on','Display','off');
+    vehicle.control_cvx.problem.options.TolCon = 1e-3;
+    vehicle.control_cvx.problem.options.TolFun = 1e-3;
+    vehicle.control_cvx.problem.options.TolX = 1e-3;
 %problem.options = optimset('Algorithm','trust-region-reflective','Display','off');
 % 
 %               Algorithm: [ active-set | interior-point | interior-point-convex | levenberg-marquardt | ...
@@ -104,16 +114,16 @@ if(~isfield(vehicle.control_cvx,'H'))
 end
 
 
-if(vehicle.control_cvx.iter == 2 || (~vehicle.control_cvx.solved) || any(Ftarget_in ~= vehicle.control_cvx.Ftarget))
+if( 0 || vehicle.control_cvx.iter == 2 || (~vehicle.control_cvx.solved) || any(Ftarget_in ~= vehicle.control_cvx.Ftarget))
 
     
 bMyd = vehicle.control_cvx.BMy *  vehicle.estimator_dist.Myd;
 bbar = [x0 ; repmat(bMyd, N-1,1)];
 
 
-fd = Ftarget;
-cx = -2*C'*Qy * fd;
-cu = -2*D'*Qy * fd;
+ydesired = [0; Ftarget]; %q = 0 [Fx,Fz] = Ftarget
+cx = -2*C'*Qy * ydesired;
+cu = -2*D'*Qy * ydesired;
     
 cxbart = repmat(cx,N,1)';
 cubart = repmat(cu,N,1)';
@@ -137,27 +147,6 @@ vehicle.control_cvx.problem.x0 = vehicle.control_cvx.usol;
 vehicle.control_cvx.problem.Beq = -vehicle.control_cvx.c1 * dbart';
 
 u = quadprog(vehicle.control_cvx.problem);
-
-% % xHx + c'x = norm(Ax - b) = x'A'Ax -2 b'Ax +b'b ; c'=-2b'A -> c=-2*A'*b 
-% tic
-% A = chol(problem.H);
-% b = -inv(A')*problem.f/2; 
-% [u, ~] = bvls(A,b,problem.lb,problem.ub);
-% toc
-
-% 
-%      cvx_begin
-%      
-%      cvx_quiet(false);
-%      variable u(n*N);
-%      
-%      
-%      minimize transpose(u)*problem.H*u/2 + CUbart*u;
-%      subject to
-%      u >= 0;
-%      u <= vehicle.tmax;
-%      problem.Aeq * u == problem.Beq;   
-%      cvx_end
 
 
     u(end-3:end) = u(end-7:end-4);
