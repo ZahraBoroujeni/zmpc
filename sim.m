@@ -5,9 +5,10 @@ ctrl = {'lqru', 'pid', 'mpc', 'mpc2'};
 %controller_type = 'mpc'; 
 
 
-for i = 4
+
+for ctrl_idx = 4 %4
     
-controller_type = ctrl{i};
+controller_type = ctrl{ctrl_idx};
 
 tic;
 clear vehicle;
@@ -18,31 +19,31 @@ cvx_quiet(true);
 
 
 
-Tmax = 3;
+Tmax = 2;
 t = 0:vehicle.dt:Tmax;
 n = length(t);
 U = zeros(4,n);
-X = zeros(2,n);
 FM = zeros(3,n);
+Y = zeros(size(vehicle.sysSim.c,1),n);
 Mycmd = zeros(1,n);
 thetaCmd = Mycmd;
 %estimator
 Mydist = Mycmd;
-Xest = X;
+ThetaQEst = zeros(2,n);
 
 %target Fx Fz
 %Ftarget = [15; -1.2*vehicle.weight];
 Ftarget = [3; -1*vehicle.weight];
 
 %initial attitude
-vehicle.x = [5*pi/180 ; -1*pi/180];
-%intialize disturbance estimator
-vehicle.estimator_dist.xd = [vehicle.x ; 0];
-%vehicle.estimator_dist.Myd = 1;
+vehicle.xsim(1) = 5*pi/180;
+Y(:,1) = vehicle.sysSim.C * vehicle.xsim;
 
-X(:,1) = vehicle.x;
-FM(:,1) = vehicle.FM;
-Xest(:,1) = X(:,1);
+%intialize disturbance estimator
+vehicle.estimator_dist.xd = [vehicle.xsim(1); 0 ; 0];
+ThetaQEst(:,1) = vehicle.estimator_dist.xd(1:2);
+%vehicle.estimator_dist.Myd = 1;
+vehicle = dynamics(vehicle,zeros(4,1));
 
 
 for i = 1:n-1
@@ -69,11 +70,12 @@ for i = 1:n-1
     end
     U(:,i) = vehicle.U;
     vehicle = dynamics(vehicle,U(:,i));
-    X(:,i+1) = vehicle.x; 
+    vehicle = estimator(vehicle); 
+
+    Y(:,i+1) = vehicle.ysim; 
     FM(:,i+1) = vehicle.FM;
     
-    vehicle = estimator_dist(vehicle); 
-    Xest(:,i+1) = vehicle.estimator_dist.xd(1:2);
+    ThetaQEst(:,i+1) = vehicle.estimator_dist.xd(1:2);
     Mydist(:,i) = vehicle.estimator_dist.Myd;
    
     
@@ -86,8 +88,9 @@ toc;
 U(:,end) = U(:,end-1);
 U = U/(vehicle.weight/size(U,1));
 thetaCmd_d = thetaCmd * 180/pi;
-theta_d = X(1,:)*180/pi;
-thetaEst_d = Xest(1,:)*180/pi;
+theta_d = Y(vehicle.thetaIndex,:)*180/pi;
+q_d = Y(vehicle.qIndex,:)*180/pi;
+thetaEst_d = ThetaQEst(1,:)*180/pi;
 Fx = FM(1,:);
 Fz = FM(2,:);
 My = FM(3,:);
@@ -95,9 +98,11 @@ My = FM(3,:);
 figuren(controller_type); clf;
 subplot(2,2,1);
 plot(t,theta_d,'b',t,thetaCmd_d,'b--',t,thetaEst_d,'k--');
+hold on;
+plot(t,q_d,'g--');
 ylim([-20 20]); grid on;
 xlabel('time'); ylabel('theta');
-legend('Theta','ThetaCmd','ThetaEst');
+legend('Theta','ThetaCmd','ThetaEst','q');
 
 
 subplot(2,2,2);

@@ -10,8 +10,8 @@ zeta = vehicle.control_pid.theta_cmd_z;
 thetamax = 15*pi/180;
 thetamin = -thetamax;
 
-theta = vehicle.x(1);
-q = vehicle.x(2);
+theta = vehicle.theta;
+q = vehicle.q;
 
 Fxcmd = Ftarget(1);
 Fzcmd = Ftarget(2)/cos(theta); %Fz / cos(theta)
