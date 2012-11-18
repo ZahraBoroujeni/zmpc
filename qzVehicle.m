@@ -22,11 +22,39 @@ vehicle.U = zeros(4,1);
 vehicle.A = [0 1; 0 0];
 vehicle.B = [0 ; 1 / vehicle.Iyy];
 vehicle.sysd = c2d(ss(vehicle.A,vehicle.B,eye(size(vehicle.A)),[]),vehicle.dt);
-
+vehicle.sysd.InputName = 'My';
+vehicle.sysd.OutputName = {'\theta','q'};
  
 Glcm = ss(vehicle.lcm,'InputName',{'t1','t2','t3','t4'}, ...
                         'OutputName',{'Fx_{cmd}','Fz_{cmd}','My_{cmd}'});
-                         
+
+                    
+          
+%Motor dynamics:
+M_omega1 = 22/1.4;
+M_omega2 = 60*2*pi;
+motor_dynamics = tf(1/( (s/M_omega1) + 1) /( (s/M_omega2) + 1));
+motor_dynamics = tf(1);
+motor_dynamics = ss(motor_dynamics);
+z = tf('z',.01);
+%motor_dynamics = c2d(motor_dynamics,.01) * ss(1/(z^2)); %.02 time delay;
+motor_dynamics.InputName = 'My_{cmd}';
+motor_dynamics.OutputName = 'My';
+
+vehicle.actD.sysd = connect(motor_dynamics, Glcm, Glcm.InputName, motor_dynamics.OutputName);
+vehicle.actD.tstates = zeros(size(vehicle.actD.sysd.a,1),1);
+
+vehicle.sysd = connect(vehicle.actD.sysd,vehicle.sysd,vehicle.actD.sysd.InputName, vehicle.sysd.OutputName);
+
+%converge the actuator to trim state initially!
+tin = vehicle.weight/4 * ones(4,1);
+for i = 1:100
+    vehicle.actD.tstates = vehicle.actD.sysd.a * vehicle.actD.tstates + vehicle.actD.sysd.b * tin;
+end
+          
+                    
+             
+                    
 vehicle.sysSim = connect(Gy,Gz,Glcm, [Glcm.InputName; 'My_{dist}'; 'u_{wind}'],[Gy.OutputName; Gz.OutputName]); 
 vehicle.sysSim = c2d(vehicle.sysSim,vehicle.dt);
 vehicle.xsim = 0 * zeros(size(vehicle.sysSim.a,1),1);
@@ -89,25 +117,4 @@ vehicle.estimator_dist.Cxd = [eye(2) , zeros(2,1)];
 vehicle.estimator_dist.Lxd = -[1 0; 
                               0 1;
                               0 5];
-
-
-%Motor dynamics:
-M_omega1 = 22/1.4;
-M_omega2 = 60*2*pi;
-motor_dynamics = tf(1/( (s/M_omega1) + 1) /( (s/M_omega2) + 1));
-motor_dynamics = ss(motor_dynamics);
-z = tf('z',.01);
-motor_dynamics = c2d(motor_dynamics,.01) * ss(1/(z^2)); %.02 time delay;
-motor_dynamics.InputName = 'My_{cmd}';
-motor_dynamics.OutputName = 'My';
-
-
-vehicle.actD.sysd = connect(motor_dynamics, Glcm, Glcm.InputName, motor_dynamics.OutputName);
-vehicle.actD.tstates = zeros(size(vehicle.actD.sysd.a,1),1);
-
-%converge the actuator to trim state initially!
-tin = vehicle.weight/4 * ones(4,1);
-for i = 1:100
-    vehicle.actD.tstates = vehicle.actD.sysd.a * vehicle.actD.tstates + vehicle.actD.sysd.b * tin;
-end
 

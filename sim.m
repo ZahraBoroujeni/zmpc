@@ -1,4 +1,4 @@
-ctrl = {'lqru', 'pid', 'mpc', 'mpc2'};
+ctrl = {'lqru', 'pid', 'mpc', 'mpc2', 'fastmpc'};
 
 %controller_type = 'lqru';
 %controller_type = 'pid'; 
@@ -6,7 +6,7 @@ ctrl = {'lqru', 'pid', 'mpc', 'mpc2'};
 
 
 
-for ctrl_idx = 4 %4
+for ctrl_idx = 5 %4
     
 controller_type = ctrl{ctrl_idx};
 
@@ -48,6 +48,11 @@ vehicle = dynamics(vehicle,zeros(4,1));
 
 for i = 1:n-1
     switch controller_type
+        case 'fastmpc'
+            vehicle = control_fastmpc(vehicle,Ftarget);
+            Mycmd(:,i) = 0;
+            thetaCmd(:,i) = 0;
+            
         case 'mpc2'
             vehicle = control_cvx_noineq(vehicle,Ftarget);
             Mycmd(:,i) = 0;
