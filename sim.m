@@ -6,20 +6,18 @@ ctrl = {'lqru', 'pid', 'mpc', 'mpc2', 'fastmpc'};
 
 
 
-for ctrl_idx = 5 %4
+for ctrl_idx =5 %4
     
 controller_type = ctrl{ctrl_idx};
 
-tic;
 clear vehicle;
 qzVehicle;
-toc;
 cvx_solver sedumi;
 cvx_quiet(true); 
 
 
 
-Tmax = 2;
+Tmax = 3;
 t = 0:vehicle.dt:Tmax;
 n = length(t);
 U = zeros(4,n);
@@ -32,8 +30,8 @@ Mydist = Mycmd;
 ThetaQEst = zeros(2,n);
 
 %target Fx Fz
-%Ftarget = [15; -1.2*vehicle.weight];
-Ftarget = [3; -1*vehicle.weight];
+Ftarget = [15; -1.2*vehicle.weight];
+%Ftarget = [3; -1*vehicle.weight];
 
 %initial attitude
 vehicle.xsim(1) = 5*pi/180;
@@ -45,7 +43,7 @@ ThetaQEst(:,1) = vehicle.estimator_dist.xd(1:2);
 %vehicle.estimator_dist.Myd = 1;
 vehicle = dynamics(vehicle,zeros(4,1));
 
-
+tstart = tic;
 for i = 1:n-1
     switch controller_type
         case 'fastmpc'
@@ -88,13 +86,23 @@ for i = 1:n-1
         fprintf(1,'%2.1f%%\n',100*i/n);
     end
 end
+
+deltaT = toc(tstart);
+
+if(isfield(vehicle.control_cvx,'numSol'))
+    numSol = vehicle.control_cvx.numSol;
+    deltaT_persolve =   vehicle.control_cvx.deltaT/vehicle.control_cvx.numSol;
+else
+    numSol = 0;
+end
+fprintf(1,'runttime was %f (total solves = %i , per solve = %3.0fms) \n', deltaT, numSol, deltaT_persolve*1000);
+
 %%
-toc;
-U(:,end) = U(:,end-1);
 U = U/(vehicle.weight/size(U,1));
 thetaCmd_d = thetaCmd * 180/pi;
 theta_d = Y(vehicle.thetaIndex,:)*180/pi;
 q_d = Y(vehicle.qIndex,:)*180/pi;
+u = Y(vehicle.uIndex,:);
 thetaEst_d = ThetaQEst(1,:)*180/pi;
 Fx = FM(1,:);
 Fz = FM(2,:);
@@ -105,9 +113,10 @@ subplot(2,2,1);
 plot(t,theta_d,'b',t,thetaCmd_d,'b--',t,thetaEst_d,'k--');
 hold on;
 plot(t,q_d,'g--');
+plot(t,u,'r');
 ylim([-20 20]); grid on;
 xlabel('time'); ylabel('theta');
-legend('Theta','ThetaCmd','ThetaEst','q');
+legend('Theta','ThetaCmd','ThetaEst','q','u');
 
 
 subplot(2,2,2);
@@ -127,7 +136,6 @@ plot(t,My,'b', t, Mycmd,'b--', t, -Mydist, 'k--');
 ylim([-3 3]); grid on;
 xlabel('time'); ylabel('My');
 legend('My','Mycmd','-Mydist');
-toc;
 
 
 end

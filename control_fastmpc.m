@@ -5,9 +5,18 @@ function vehicle = control_fastmpc(vehicle, Ftarget_in)
 %y = [-W , 0] * x + [-1 -1 -1 -1] * u
 N = 50; T = N;
 m = 4;
-x0  = [vehicle.theta; vehicle.q];
-nStates = numel(x0);
-n = nStates;
+n = size(vehicle.sysd.a,1);
+
+
+if(~isfield(vehicle.control_cvx,'x'));
+    vehicle.control_cvx.x  = zeros(n,1);
+end
+
+x0  = vehicle.control_cvx.x(:,1);
+x0(vehicle.sysdthetaIndex) = vehicle.theta;
+x0(vehicle.sysdqIndex) = vehicle.q;
+
+
 
 Ftarget = Ftarget_in;
 theta_Fx = asind(Ftarget(1)/vehicle.weight);
@@ -15,15 +24,12 @@ theta_Fx = max(min(theta_Fx,15),-15);
 Ftarget(1) = sind(theta_Fx)*vehicle.weight;
 
 
-Qy = diag([1 ; 50]);
+Qy = diag([10 ; 50]);
 Qyfinal = diag([1; 100]);
 r = 2;
 R = diag(r*ones(m,1));
-C = zeros(2,nStates);
-C(1,1) = -vehicle.weight; %Fx = -theta*mg
-D = [ zeros(1,4);
-     -cos(vehicle.theta)*ones(1,m);]; %Fz = -sum(ucmd) -> should be moved as part of C since thrust is now a state!?
-
+C = vehicle.sysd.C; C(1,3) = -cos(vehicle.theta)*vehicle.weight;
+D = vehicle.sysd.D;
 
     
 if(~isfield(vehicle.control_cvx,'H'))
@@ -45,10 +51,10 @@ if(~isfield(vehicle.control_cvx,'H'))
     vehicle.control_cvx.H = blkdiag(Qu,QSR{:},Qxf);
     vehicle.control_cvx.Qxu = Qxu;
    
-     vehicle.control_cvx.fastC = zeros(T*(nStates),T*(nStates+m));
-    I = eye(nStates);
+     vehicle.control_cvx.fastC = zeros((T+1)*(n),(T)*(n+m));
+    I = eye(n);
     vehicle.control_cvx.fastC(1:n,1:(n+m)) = [-B,  I];
-    fastC = [-A , -B, eye(nStates)];
+    fastC = [-A , -B, eye(n)];
     
     rows = 1:n; rows = rows + n;
     cols = (m+1):(m+1+(2*n+m)-1);
@@ -57,13 +63,14 @@ if(~isfield(vehicle.control_cvx,'H'))
         rows = rows + n;
         cols = cols + (n+m);
     end
+    vehicle.control_cvx.fastC(rows,cols-n-m) = [0*A , -B, (eye(n)-A)];
 
 
     
     Fu = [eye(m) ; -eye(m)];
     vehicle.control_cvx.fu = repmat([vehicle.tmax * ones(m,1); vehicle.tmin * ones(m,1)],T,1);
     l = 2*m;
-    vehicle.control_cvx.fastP = zeros((T-1)*l,T*(nStates+m));
+    vehicle.control_cvx.fastP = zeros((T-1)*l,T*(n+m));
 
     rows = 1:l;
     cols = 1:m;
@@ -77,11 +84,11 @@ if(~isfield(vehicle.control_cvx,'H'))
     vehicle.control_cvx.problem.Aeq = vehicle.control_cvx.fastC;
     vehicle.control_cvx.problem.lb = -Inf(T*(n+m),1);
     vehicle.control_cvx.problem.ub = Inf(T*(n+m),1);
-%     for i = 1:T
-%         uIndex = (1:m) + (i-1)*(n+m);
-%         vehicle.control_cvx.problem.lb(uIndex) = vehicle.tmin * ones(m,1);
-%         vehicle.control_cvx.problem.ub(uIndex) = vehicle.tmax * ones(m,1);
-%     end
+    for i = 1:T
+        uIndex = (1:m) + (i-1)*(n+m);
+        vehicle.control_cvx.problem.lb(uIndex) = vehicle.tmin * ones(m,1);
+        vehicle.control_cvx.problem.ub(uIndex) = vehicle.tmax * ones(m,1);
+    end
     
     vehicle.control_cvx.problem.solver = 'quadprog';
     vehicle.control_cvx.problem.options = optimset('Algorithm','interior-point-convex',...
@@ -96,38 +103,48 @@ if(~isfield(vehicle.control_cvx,'H'))
 
     vehicle.control_cvx.usol = zeros(m*N,1);
     vehicle.control_cvx.iter = 0;
+    vehicle.control_cvx.numSol = 0;
+    vehicle.control_cvx.deltaT = 0;
+
 end
 
 
-if( vehicle.control_cvx.iter == 2 || (~vehicle.control_cvx.solved) || any(Ftarget_in ~= vehicle.control_cvx.Ftarget))
+if(vehicle.control_cvx.iter == 2 || (~vehicle.control_cvx.solved) || any(Ftarget_in ~= vehicle.control_cvx.Ftarget))
 
+    tstart = tic;
+    w = zeros(n,1);
+    wdelta = vehicle.sysdMy.b *  vehicle.estimator_dist.Myd;
+    w(vehicle.sysdthetaIndex) = wdelta(1);
+    w(vehicle.sysdqIndex) = wdelta(2);
     
-w = vehicle.sysdMy.b *  vehicle.estimator_dist.Myd;
-b = [vehicle.sysd.A*x0 + w; repmat(w, N-1,1)];
+    b = [vehicle.sysd.A*x0 + w; repmat(w, N-1,1); w];
+    
+    
+    ydesired = [Ftarget]; %q = 0 [Fx,Fz] = Ftarget
+    cx = -2*C'*Qy * ydesired;
+    cxf = -2*C'*Qyfinal* ydesired;
+    cu = -2*D'*Qy * ydesired;
+    
+    q = cx; qf = cxf;
+    r = cu;
+    
+    g = [r+2*vehicle.control_cvx.Qxu'*x0 ; q ; repmat([r ; q],T-2,1) ; r ; qf];
+    
+    %    X = quadprog(PROBLEM) finds the minimum for PROBLEM. PROBLEM is a
+    %     structure with matrix 'H' in PROBLEM.H, the vector 'f' in PROBLEM.f,
+    %     the linear inequality constraints in PROBLEM.Aineq and PROBLEM.bineq,
+    %     the linear equality constraints in PROBLEM.Aeq and PROBLEM.beq, the
+    %     lower bounds in PROBLEM.lb, the upper bounds in PROBLEM.ub, the start
+    %     point in PROBLEM.x0
+    
+    vehicle.control_cvx.problem.f = g;
+    vehicle.control_cvx.problem.x0 = vehicle.control_cvx.usol;
+    vehicle.control_cvx.problem.Beq = b;
+    
+    [z, J, exitFlag]  = quadprog(vehicle.control_cvx.problem);
+    vehicle.control_cvx.deltaT = vehicle.control_cvx.deltaT + toc(tstart);
+    vehicle.control_cvx.numSol = vehicle.control_cvx.numSol + 1;
 
-
-ydesired = [Ftarget]; %q = 0 [Fx,Fz] = Ftarget
-cx = -2*C'*Qy * ydesired;
-cxf = -2*C'*Qyfinal* ydesired;
-cu = -2*D'*Qy * ydesired;
-
-q = cx; qf = cxf;
-r = cu;
-
-g = [r+2*vehicle.control_cvx.Qxu'*x0 ; q ; repmat([r ; q],T-2,1) ; r ; qf];
-
-%    X = quadprog(PROBLEM) finds the minimum for PROBLEM. PROBLEM is a
-%     structure with matrix 'H' in PROBLEM.H, the vector 'f' in PROBLEM.f,
-%     the linear inequality constraints in PROBLEM.Aineq and PROBLEM.bineq,
-%     the linear equality constraints in PROBLEM.Aeq and PROBLEM.beq, the
-%     lower bounds in PROBLEM.lb, the upper bounds in PROBLEM.ub, the start
-%     point in PROBLEM.x0
-
-vehicle.control_cvx.problem.f = g;
-vehicle.control_cvx.problem.x0 = vehicle.control_cvx.usol;
-vehicle.control_cvx.problem.Beq = b;
-
-[z, J, exitFlag]  = quadprog(vehicle.control_cvx.problem);
     u_x = reshape(z,n+m,T);
     u = u_x(1:m,:);
     x = u_x(m+1:end,:);

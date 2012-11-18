@@ -21,9 +21,10 @@ vehicle.U = zeros(4,1);
 % vehicle.A =  Gy_reduced.a;
 vehicle.A = [0 1; 0 0];
 vehicle.B = [0 ; 1 / vehicle.Iyy];
-vehicle.sysd = c2d(ss(vehicle.A,vehicle.B,eye(size(vehicle.A)),[]),vehicle.dt);
+vehicle.sysd = c2d(ss(vehicle.A,vehicle.B,[-vehicle.weight, 0], 0),vehicle.dt);
 vehicle.sysd.InputName = 'My';
-vehicle.sysd.OutputName = {'\theta','q'};
+vehicle.sysd.OutputName = {'Fx'};
+vehicle.sysd.StateName = {'\theta','q'};
  
 Glcm = ss(vehicle.lcm,'InputName',{'t1','t2','t3','t4'}, ...
                         'OutputName',{'Fx_{cmd}','Fz_{cmd}','My_{cmd}'});
@@ -34,23 +35,21 @@ Glcm = ss(vehicle.lcm,'InputName',{'t1','t2','t3','t4'}, ...
 M_omega1 = 22/1.4;
 M_omega2 = 60*2*pi;
 motor_dynamics = tf(1/( (s/M_omega1) + 1) /( (s/M_omega2) + 1));
-motor_dynamics = tf(1);
+%motor_dynamics = tf(1);
 motor_dynamics = ss(motor_dynamics);
 z = tf('z',.01);
-%motor_dynamics = c2d(motor_dynamics,.01) * ss(1/(z^2)); %.02 time delay;
-motor_dynamics.InputName = 'My_{cmd}';
-motor_dynamics.OutputName = 'My';
+motor_dynamics = c2d(motor_dynamics,.01); %.02 time delay;
+motor_dynamics.InputName = {'My_{cmd}'};
+motor_dynamics.OutputName = {'My'};
 
-vehicle.actD.sysd = connect(motor_dynamics, Glcm, Glcm.InputName, motor_dynamics.OutputName);
+vehicle.actD.sysd = connect(motor_dynamics, Glcm, Glcm.InputName, [motor_dynamics.OutputName,{'Fz_{cmd}'}]);
 vehicle.actD.tstates = zeros(size(vehicle.actD.sysd.a,1),1);
 
-vehicle.sysd = connect(vehicle.actD.sysd,vehicle.sysd,vehicle.actD.sysd.InputName, vehicle.sysd.OutputName);
+vehicle.sysd = connect(vehicle.actD.sysd,vehicle.sysd,vehicle.actD.sysd.InputName, {'Fx','Fz_{cmd}'});
 
 %converge the actuator to trim state initially!
-tin = vehicle.weight/4 * ones(4,1);
-for i = 1:100
-    vehicle.actD.tstates = vehicle.actD.sysd.a * vehicle.actD.tstates + vehicle.actD.sysd.b * tin;
-end
+vehicle.sysdthetaIndex = find(strcmp(vehicle.sysd.StateName,'\theta'));
+vehicle.sysdqIndex = find(strcmp(vehicle.sysd.StateName,'q'));
           
                     
              
@@ -68,7 +67,7 @@ vehicle.Fzindex = find(strcmp(vehicle.sysSim.OutputName,'Fz'));
 
 
 vehicle.Fzdist = 0 ;
-vehicle.Mydist = 0 ;
+vehicle.Mydist = -1 ;
 vehicle.uwind = 0;
 
 
@@ -77,6 +76,7 @@ vehicle.uwind = 0;
 vehicle.AMy = vehicle.A(1:2,1:2);
 vehicle.BMy = [ 0 ; 1/vehicle.Iyy];
 vehicle.sysdMy = c2d(ss(vehicle.AMy,vehicle.BMy,[],[]),vehicle.dt);
+vehicle.sysdMy.StateName ={'\theta', 'q'}; 
 
 %command and command rate for filter
 vehicle.control_pid.theta_cmd_wn = 18;
