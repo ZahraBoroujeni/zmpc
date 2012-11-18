@@ -3,7 +3,7 @@ function vehicle = control_fastmpc(vehicle, Ftarget_in)
 %x = Ax * Bu where x = [theta, theta_dot]
 %y = [Fx; delta_Fz] = [-W*theta ; ]
 %y = [-W , 0] * x + [-1 -1 -1 -1] * u
-N = 50; T = N;
+N = 100; T = N;
 m = 4;
 n = size(vehicle.sysd.a,1);
 
@@ -15,6 +15,7 @@ end
 x0  = vehicle.control_cvx.x(:,1);
 x0(vehicle.sysdthetaIndex) = vehicle.theta;
 x0(vehicle.sysdqIndex) = vehicle.q;
+x0(vehicle.sysduIndex) = vehicle.u;
 
 
 
@@ -24,8 +25,8 @@ theta_Fx = max(min(theta_Fx,15),-15);
 Ftarget(1) = sind(theta_Fx)*vehicle.weight;
 
 
-Qy = diag([10 ; 50]);
-Qyfinal = diag([1; 100]);
+Qy = diag([5 ; 100]);
+Qyfinal = diag([5; 100]);
 r = 2;
 R = diag(r*ones(m,1));
 C = vehicle.sysd.C; C(1,3) = -cos(vehicle.theta)*vehicle.weight;
@@ -109,7 +110,7 @@ if(~isfield(vehicle.control_cvx,'H'))
 end
 
 
-if(vehicle.control_cvx.iter == 2 || (~vehicle.control_cvx.solved) || any(Ftarget_in ~= vehicle.control_cvx.Ftarget))
+if( 1 || vehicle.control_cvx.iter == 2 || (~vehicle.control_cvx.solved))
 
     tstart = tic;
     w = zeros(n,1);

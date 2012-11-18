@@ -5,7 +5,7 @@ function vehicle = estimator(vehicle)
 
 
 
-ym = [vehicle.theta; vehicle.q];
+ym = [vehicle.theta; vehicle.q; vehicle.u];
 
 
 %what's the current expected measurement?

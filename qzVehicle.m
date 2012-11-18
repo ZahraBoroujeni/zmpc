@@ -17,14 +17,17 @@ vehicle.FM = [0 ; 0 ; 0];
 vehicle.U = zeros(4,1);
 
 
-% Gy_reduced = plantReduce(Gy,{'\theta','q','u'},'My_{cmd}',{'\theta','q_{INS}','u'});
-% vehicle.A =  Gy_reduced.a;
-vehicle.A = [0 1; 0 0];
-vehicle.B = [0 ; 1 / vehicle.Iyy];
-vehicle.sysd = c2d(ss(vehicle.A,vehicle.B,[-vehicle.weight, 0], 0),vehicle.dt);
+plantReduce(Gy,{'u','\theta','q'},'My_{cmd}',{'\theta','q_{INS}'});
+vehicle.A =  Gy_reduced.a;
+vehicle.B = [0; 1/vehicle.Iyy; 0];
+vehicle.C = [-vehicle.weight, 0, 0];
+%vehicle.A = [0 1; 0 0];
+%vehicle.B = [0 ; 1 / vehicle.Iyy];
+vehicle.sysd = c2d(ss(vehicle.A,vehicle.B,vehicle.C, 0),vehicle.dt);
 vehicle.sysd.InputName = 'My';
 vehicle.sysd.OutputName = {'Fx'};
-vehicle.sysd.StateName = {'\theta','q'};
+vehicle.sysd.StateName = {'\theta','q','u'};
+
  
 Glcm = ss(vehicle.lcm,'InputName',{'t1','t2','t3','t4'}, ...
                         'OutputName',{'Fx_{cmd}','Fz_{cmd}','My_{cmd}'});
@@ -50,7 +53,8 @@ vehicle.sysd = connect(vehicle.actD.sysd,vehicle.sysd,vehicle.actD.sysd.InputNam
 %converge the actuator to trim state initially!
 vehicle.sysdthetaIndex = find(strcmp(vehicle.sysd.StateName,'\theta'));
 vehicle.sysdqIndex = find(strcmp(vehicle.sysd.StateName,'q'));
-          
+vehicle.sysduIndex = find(strcmp(vehicle.sysd.StateName,'u'));
+
                     
              
                     
@@ -67,36 +71,43 @@ vehicle.Fzindex = find(strcmp(vehicle.sysSim.OutputName,'Fz'));
 
 
 vehicle.Fzdist = 0 ;
-vehicle.Mydist = -1 ;
+vehicle.Mydist = 1 ;
 vehicle.uwind = 0;
 
 
 
 %same as above but bunching actuators as My
-vehicle.AMy = vehicle.A(1:2,1:2);
-vehicle.BMy = [ 0 ; 1/vehicle.Iyy];
+vehicle.AMy = vehicle.A;
+vehicle.BMy = [ 0 ; 1/vehicle.Iyy; 0];
 vehicle.sysdMy = c2d(ss(vehicle.AMy,vehicle.BMy,[],[]),vehicle.dt);
-vehicle.sysdMy.StateName ={'\theta', 'q'}; 
+vehicle.sysdMy.StateName ={'\theta', 'q', 'u'}; 
 
 %command and command rate for filter
-vehicle.control_pid.theta_cmd_wn = 18;
-vehicle.control_pid.theta_cmd_z = 1;
-vehicle.control_pid.theta_cmd = 0;
-vehicle.control_pid.theta_cmd_rate = 0;
+vehicle.control_pid.cmd_wn = 18;
+vehicle.control_pid.cmd_z = 1;
+vehicle.control_pid.slewrate = 100 * pi /180; 
+vehicle.control_pid.cmd = 0;
+vehicle.control_pid.cmd_rate = 0;
 vehicle.control_pid.theta_errI = 0; %integrated error 
 
-vehicle.control_lqru = vehicle.control_pid;
-%this is to handle the fact that we are doing tracking instead of
-%regulating
-vehicle.control_lqru.BinvIA = pinv(vehicle.sysdMy.B)*(eye(size(vehicle.sysdMy.A)) - vehicle.sysdMy.A);
-vehicle.control_lqru.Q = diag([1 .01]);
-vehicle.control_lqru.R = .01;
-%vehicle.control_lqru.K = dlqr(vehicle.sysdMy.A,vehicle.sysdMy.B,...
- %                            vehicle.control_lqru.Q, vehicle.control_lqru.R);
+%for u-loop
+vehicle.control_u_pid = vehicle.control_pid;
+vehicle.control_u_pid.cmd_wn = 10; 
+vehicle.control_u_pid.slewrate = 2; 
 
-%Testing finite horizon lqr...
-vehicle.control_lqru.K = lqr_finite(vehicle.sysdMy.A,vehicle.sysdMy.B,300,...
-                             vehicle.control_lqru.Q, vehicle.control_lqru.R);
+
+% vehicle.control_lqru = vehicle.control_pid;
+% %this is to handle the fact that we are doing tracking instead of
+% %regulating
+% vehicle.control_lqru.BinvIA = pinv(vehicle.sysdMy.B)*(eye(size(vehicle.sysdMy.A)) - vehicle.sysdMy.A);
+% vehicle.control_lqru.Q = diag([1 .01]);
+% vehicle.control_lqru.R = .01;
+% %vehicle.control_lqru.K = dlqr(vehicle.sysdMy.A,vehicle.sysdMy.B,...
+%  %                            vehicle.control_lqru.Q, vehicle.control_lqru.R);
+% 
+% %Testing finite horizon lqr...
+% vehicle.control_lqru.K = lqr_finite(vehicle.sysdMy.A,vehicle.sysdMy.B,300,...
+%                              vehicle.control_lqru.Q, vehicle.control_lqru.R);
 
 %control mix weight on Fz_err and My_err
 vehicle.ctrlmix_W = [1 0; 0 1000];
@@ -108,13 +119,14 @@ vehicle.control_cvx.Ftarget = [0; 0];
 
 %Estimator settings
 vehicle.estimator_dist.Myd = 0; 
-vehicle.estimator_dist.xd = [0 ; 0 ;vehicle.estimator_dist.Myd]; %theta, theta_dot, Myd
+vehicle.estimator_dist.xd = [0 *ones(size(vehicle.sysdMy.A,1),1) ;vehicle.estimator_dist.Myd]; %theta, theta_dot, Myd
 
-vehicle.estimator_dist.A = [vehicle.sysdMy.A , vehicle.sysdMy.B; zeros(1,2) , 1];
+vehicle.estimator_dist.A = [vehicle.sysdMy.A , vehicle.sysdMy.B; zeros(1,3) , 1];
 vehicle.estimator_dist.B = [vehicle.sysdMy.B ; 0];
 
-vehicle.estimator_dist.Cxd = [eye(2) , zeros(2,1)];
-vehicle.estimator_dist.Lxd = -[1 0; 
-                              0 1;
-                              0 5];
+vehicle.estimator_dist.Cxd = [eye(3) , zeros(3,1)];
+vehicle.estimator_dist.Lxd = -[1 0 0; 
+                              0 1 0;
+                              0 0 0;
+                              0 5 0];
 

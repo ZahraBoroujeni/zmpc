@@ -5,15 +5,22 @@ ctrl = {'lqru', 'pid', 'mpc', 'mpc2', 'fastmpc'};
 %controller_type = 'mpc'; 
 
 
-
-for ctrl_idx =5 %4
+for ctrl_idx = [2,5]
     
 controller_type = ctrl{ctrl_idx};
+
 
 clear vehicle;
 qzVehicle;
 cvx_solver sedumi;
 cvx_quiet(true); 
+
+%target Fx Fz
+%Ftarget = [15; -1.2*vehicle.weight];
+Ftarget = [3; -1*vehicle.weight];
+uLoop = true;
+uTarget = 2;
+
 
 
 
@@ -28,23 +35,26 @@ thetaCmd = Mycmd;
 %estimator
 Mydist = Mycmd;
 ThetaQEst = zeros(2,n);
+Fhist = zeros(2,n);
 
-%target Fx Fz
-Ftarget = [15; -1.2*vehicle.weight];
-%Ftarget = [3; -1*vehicle.weight];
 
 %initial attitude
 vehicle.xsim(1) = 5*pi/180;
 Y(:,1) = vehicle.sysSim.C * vehicle.xsim;
 
 %intialize disturbance estimator
-vehicle.estimator_dist.xd = [vehicle.xsim(1); 0 ; 0];
+vehicle.estimator_dist.xd = [vehicle.xsim(1); 0 ; 0; 0];
 ThetaQEst(:,1) = vehicle.estimator_dist.xd(1:2);
 %vehicle.estimator_dist.Myd = 1;
 vehicle = dynamics(vehicle,zeros(4,1));
 
 tstart = tic;
 for i = 1:n-1
+    if(uLoop)
+        vehicle = control_u_pid(vehicle,uTarget);
+        Ftarget(1) = vehicle.control_u_pid.FxTarget;
+    end
+    Fhist(:,i) = Ftarget;
     switch controller_type
         case 'fastmpc'
             vehicle = control_fastmpc(vehicle,Ftarget);
@@ -64,7 +74,7 @@ for i = 1:n-1
         case 'pid'
             vehicle = control_pid(vehicle,Ftarget);
             Mycmd(:,i) = vehicle.control_pid.Mycmd;
-            thetaCmd(:,i) = vehicle.control_pid.theta_cmd;
+            thetaCmd(:,i) = vehicle.control_pid.cmd;
             
         case 'lqru'
             vehicle = control_lqru(vehicle,Ftarget);
@@ -116,7 +126,7 @@ plot(t,q_d,'g--');
 plot(t,u,'r');
 ylim([-20 20]); grid on;
 xlabel('time'); ylabel('theta');
-legend('Theta','ThetaCmd','ThetaEst','q','u');
+legend('Theta','ThetaCmd','ThetaEst','q','u','Location','NorthOutside');
 
 
 subplot(2,2,2);
@@ -126,10 +136,10 @@ xlabel('time'); ylabel('Normalized control');
 %legend({'t1','t2','t3','t4'});
 
 subplot(2,2,3);
-plot(t,Fx/Ftarget(1) , t, Fz/Ftarget(2));
+plot(t,Fx./vehicle.weight , t,Fhist(1,:)./vehicle.weight, t, Fz./Ftarget(2));
 ylim([-1 1.5]); grid on;
 xlabel('time'); ylabel('Normalized Forces');
-legend({'fx', 'fz'});
+legend({'fx', 'fxcmd','fz'});
 
 subplot(2,2,4);
 plot(t,My,'b', t, Mycmd,'b--', t, -Mydist, 'k--'); 

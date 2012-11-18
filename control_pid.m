@@ -4,8 +4,8 @@ kd = 2.743;
 kd2 = 1;
 ki = 4.775*0;
 kdist = 1;
-wn = vehicle.control_pid.theta_cmd_wn;
-zeta = vehicle.control_pid.theta_cmd_z;
+wn = vehicle.control_pid.cmd_wn;
+zeta = vehicle.control_pid.cmd_z;
 
 thetamax = 15*pi/180;
 thetamin = -thetamax;
@@ -20,21 +20,22 @@ thetacmd = -Fxcmd/vehicle.weight;
 thetacmd = max(min(thetacmd , thetamax),thetamin);
 
 
-cmd_accel = wn^2 * (thetacmd - vehicle.control_pid.theta_cmd)...
-             - 2.0 * zeta * wn *vehicle.control_pid.theta_cmd_rate ;
+cmd_accel = wn^2 * (thetacmd - vehicle.control_pid.cmd)...
+             - 2.0 * zeta * wn *vehicle.control_pid.cmd_rate ;
          
-vehicle.control_pid.theta_cmd_rate = vehicle.control_pid.theta_cmd_rate + ...
+vehicle.control_pid.cmd_rate = vehicle.control_pid.cmd_rate + ...
               cmd_accel * vehicle.dt;
+vehicle.control_pid.cmd_rate = clip(vehicle.control_pid.cmd_rate,-vehicle.control_pid.slewrate, vehicle.control_pid.slewrate);           
           
-vehicle.control_pid.theta_cmd = vehicle.control_pid.theta_cmd + ...
-    vehicle.control_pid.theta_cmd_rate * vehicle.dt;
+vehicle.control_pid.cmd = vehicle.control_pid.cmd + ...
+    vehicle.control_pid.cmd_rate * vehicle.dt;
 
 
-err = (vehicle.control_pid.theta_cmd - theta);
+err = (vehicle.control_pid.cmd - theta);
 vehicle.control_pid.theta_errI = vehicle.control_pid.theta_errI + err*vehicle.dt;
 
 vehicle.control_pid.Mycmd = kp * err + ...
-        kd * (vehicle.control_pid.theta_cmd_rate - q) ...
+        kd * (vehicle.control_pid.cmd_rate - q) ...
         - kd2 * q ...
         + ki * vehicle.control_pid.theta_errI ...
         - kdist * vehicle.estimator_dist.Myd;
