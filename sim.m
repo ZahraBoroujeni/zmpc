@@ -5,7 +5,7 @@ ctrl = {'lqru', 'pid', 'mpc', 'mpc2', 'fastmpc'};
 %controller_type = 'mpc'; 
 
 
-for ctrl_idx = [2,5]
+for ctrl_idx = [2, 5]
     
 controller_type = ctrl{ctrl_idx};
 
@@ -63,7 +63,7 @@ for i = 1:n-1
             
         case 'mpc2'
             vehicle = control_cvx_noineq(vehicle,Ftarget);
-            Mycmd(:,i) = 0;
+            Mycmd(:,i) = vehicle.lcm(3,:)  * vehicle.U;
             thetaCmd(:,i) = 0;
             
         case 'mpc' 
@@ -126,7 +126,7 @@ plot(t,q_d,'g--');
 plot(t,u,'r');
 ylim([-20 20]); grid on;
 xlabel('time'); ylabel('theta');
-legend('Theta','ThetaCmd','ThetaEst','q','u','Location','NorthOutside');
+legend('Theta','ThetaCmd','ThetaEst','q','u','Location','EastOutside');
 
 
 subplot(2,2,2);

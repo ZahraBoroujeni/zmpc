@@ -25,12 +25,13 @@ theta_Fx = max(min(theta_Fx,15),-15);
 Ftarget(1) = sind(theta_Fx)*vehicle.weight;
 
 
-Qy = diag([5 ; 100]);
-Qyfinal = diag([5; 100]);
-r = 2;
+Qy = diag([5 ; 50]);
+Qyfinal = diag([5; 50]);
+r =  1;
 R = diag(r*ones(m,1));
-C = vehicle.sysd.C; C(1,3) = -cos(vehicle.theta)*vehicle.weight;
-D = vehicle.sysd.D;
+C = vehicle.sysd.C; 
+
+D = vehicle.sysd.D*cos(vehicle.theta);
 
     
 if(~isfield(vehicle.control_cvx,'H'))
