@@ -194,6 +194,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     {
     	memset(g,0,sizeof(double)*nz);
     }
+
+
     t1 = clock();
     fmpcsolve(A,B,At,Bt,eyen,eyem,Q,R,Qf,g,w,zmax,zmin,x,z,T,n,m,nz,niters,kappa);
     t2 = clock();
@@ -318,7 +320,7 @@ void fmpcsolve(double *A, double *B, double *At, double *Bt, double *eyen,
         {
             cont = 0;
             dptr = z; dptr1 = dz; dptr2 = zmax; dptr3 = zmin;
-            for (i = 0; i < nz; i++)
+            for (i = 0; i < nz && cont == 0; i++)
             {
                 if (*dptr+s*(*dptr1) >= *dptr2) cont = 1;
                 if (*dptr+s*(*dptr1) <= *dptr3) cont = 1;
@@ -326,6 +328,13 @@ void fmpcsolve(double *A, double *B, double *At, double *Bt, double *eyen,
             }
             if (cont == 1)
             {
+            	if(s<0.01)
+            	{
+            		printf("s = %g for z[%i]=%g is infeasible !\n",s,i-1,dz[i-1]);
+
+            		s = 0;
+            		break;
+            	}
                 s = beta*s;
                 continue;
             }
@@ -352,7 +361,17 @@ void fmpcsolve(double *A, double *B, double *At, double *Bt, double *eyen,
             gfgphp(Q,R,Qf,g,zmax,zmin,newz,T,n,m,nz,newgf,newgp,newhp);
             rdrp(A,B,Q,R,Qf,newz,newnu,newgf,newgp,b,T,n,m,nz,kappa,newrd,newrp,newCtnu);
             resdresp(newrd,newrp,T,n,nz,&newresd,&newresp,&newres);
-            if (newres <= (1-alpha*s)*res) break;
+            if (newres <= (1-alpha*s)*res)
+            	break;
+            else if(s<1e-3)
+            {
+            	s = 0;
+            	printf("s is too small!!\n");
+            }
+            else
+            {
+            	printf("s = %g, newres = %g , oldres = %g\n",s, newres, res);
+            }
             s = beta*s;
             dptr = newnu; dptr1 = nu; dptr2 = dnu;
             for (i = 0; i < T*n; i++)
@@ -876,17 +895,18 @@ void gfgphp(double *Q, double *R, double *Qf, double * g, double *zmax, double *
     {
     	gf[i] = g[i];
     }
+
     dptr = gf; dptr1 = z; 
     for (i = 0; i < T-1; i++)
     {
-        F77_CALL(dgemv)("n",&m,&m,&ftwo,R,&m,dptr1,&ione,&fone,dptr,&ione);
+        F77_CALL(dgemv)("n",&m,&m,&ftwo,R,&m,dptr1,&ione,&fzero,dptr,&ione);
         dptr = dptr+m; dptr1 = dptr1+m;
-        F77_CALL(dgemv)("n",&n,&n,&ftwo,Q,&n,dptr1,&ione,&fone,dptr,&ione);
+        F77_CALL(dgemv)("n",&n,&n,&ftwo,Q,&n,dptr1,&ione,&fzero,dptr,&ione);
         dptr = dptr+n; dptr1 = dptr1+n;
     }
-    F77_CALL(dgemv)("n",&m,&m,&ftwo,R,&m,dptr1,&ione,&fone,dptr,&ione);
+    F77_CALL(dgemv)("n",&m,&m,&ftwo,R,&m,dptr1,&ione,&fzero,dptr,&ione);
     dptr = dptr+m; dptr1 = dptr1+m;
-    F77_CALL(dgemv)("n",&n,&n,&ftwo,Qf,&n,dptr1,&ione,&fone,dptr,&ione);
+    F77_CALL(dgemv)("n",&n,&n,&ftwo,Qf,&n,dptr1,&ione,&fzero,dptr,&ione);
 
     free(gp1); free(gp2);
     return;

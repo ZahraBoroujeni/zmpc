@@ -39,12 +39,12 @@ else
    
    delta = vehicle.control_cvx.iter + 1;
    %shift the solution
-   vehicle.control_cvx.usol(:,1:(end-delta+1)) = vehicle.usol(:,delta:end);
-   vehicle.control_cvx.xsol(:,1:(end-delta+1)) = vehicle.xsol(:,delta:end);
+   vehicle.control_cvx.usol(:,1:(end-delta+1)) = vehicle.control_cvx.usol(:,delta:end);
+   vehicle.control_cvx.xsol(:,1:(end-delta+1)) = vehicle.control_cvx.xsol(:,delta:end);
 end
 
 
-if( 1 || vehicle.control_cvx.iter == 2 || (~vehicle.control_cvx.solved))
+if( 0 || (~vehicle.control_cvx.solved))
 
     
     %compute the noise
@@ -65,9 +65,10 @@ if( 1 || vehicle.control_cvx.iter == 2 || (~vehicle.control_cvx.solved))
 %    function [U, X] = fastmpcsolve(A,B,C,D,Qy,Qyf,R, yd, w, x0, X0, U0, ubounds, xbounds)
     tstart = tic;
 
-    [U, X] = fastmpcsolve(sysd.a, sysd.b, C, D, ...
-                          Qy, Qyf, R, ydesired, w, x0,...
-                          vehicle.control_cvx.xsol, vehicle.control_cvx.usol, ...
+    [U, X] = fastmpcsolve(vehicle.sysd.a, vehicle.sysd.b, C, D, ...
+                          Qy, Qyf, 0*R, T,...
+                          ydesired, w, x0,...
+                          vehicle.control_cvx.usol, vehicle.control_cvx.xsol, ...
                           [vehicle.tmin, vehicle.tmax], []);
                       
     

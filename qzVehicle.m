@@ -72,7 +72,7 @@ vehicle.Fzindex = find(strcmp(vehicle.sysSim.OutputName,'Fz'));
 
 
 vehicle.Fzdist = 0 ;
-vehicle.Mydist = 1 ;
+vehicle.Mydist = 0 ;
 vehicle.uwind = 0;
 
 
@@ -129,5 +129,5 @@ vehicle.estimator_dist.Cxd = [eye(3) , zeros(3,1)];
 vehicle.estimator_dist.Lxd = -[1 0 0; 
                               0 1 0;
                               0 0 0;
-                              0 5 0];
+                              0 0 0];
 

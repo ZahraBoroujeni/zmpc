@@ -1,11 +1,11 @@
-function [U, X] = fastmpcsolve(A,B,C,D,Qy,Qyf,R, yd, w, x0, X0, U0, ubounds, xbounds)
-eded
+function [U, X] = fastmpcsolve(A,B,C,D,Qy,Qf,R, T, yd, w, x0, U0, X0, ubounds, xbounds)
+
 n = size(B,1);
 m = size(B,2);
 
 
 if(~exist('ubounds','var') || isempty(ubounds))
-   xbounds = [-1e6 , 1e6]; 
+   ubounds = [-1e6 , 1e6]; 
 end
 
 if(~exist('xbounds','var') || isempty(xbounds))
@@ -26,14 +26,14 @@ Qu = R;
 
 r = -2*yd'*Qy*D;
 q = -2*yd'*Qy*C;
-qf = -2*yd'*Qyf*C;
+qf = -2*yd'*Qf*C;
 
 
 % system description
 sys.A = A;
 sys.B = B;
 sys.xmin =  xbounds(1)*ones(n,1);
-sys.xmax = xbounds(2)*ones(n,1);
+sys.xmax =  xbounds(2)*ones(n,1);
 sys.umin =  ubounds(1)*ones(m,1);
 sys.umax =  ubounds(2)*ones(m,1);
 sys.n = n;
@@ -50,9 +50,9 @@ params.T = T;
 params.Qf = Qf;        % final state cost
 params.kappa = 0.01;   % barrier parameter
 params.niters = 5;     % number of newton steps
-params.quiet = true;
+params.quiet = false;
 
-[X,U,telapsed] = fmpc_step(sys,params,X0,U0,x0);
+[X,U,telapsed] = fmpc_step_old(sys,params,X0,U0,x0);
 
 
 end
