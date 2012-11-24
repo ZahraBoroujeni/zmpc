@@ -3,17 +3,17 @@ function vehicle = control_quadprog(vehicle, Ftarget_in)
 %x = Ax * Bu where x = [theta, theta_dot]
 %y = [Fx; delta_Fz] = [-W*theta ; ]
 %y = [-W , 0] * x + [-1 -1 -1 -1] * u
-N = 100; T = N;
-m = 4;
+T = 100;
 n = size(vehicle.sysd.a,1);
+m = size(vehicle.sysd.b,2);
 
 
-if(~isfield(vehicle.control_cvx,'x'));
-    vehicle.control_cvx.x  = zeros(n,1);
-    vehicle.control_cvx.x(2) = -vehicle.weight/vehicle.sysd.c(2,2);
+if(~isfield(vehicle.control_cvx,'x0'));
+    vehicle.control_cvx.x0  = zeros(n,1);
+    vehicle.control_cvx.x0(2) = -vehicle.weight/vehicle.sysd.c(2,2);
 end
 
-x0  = vehicle.control_cvx.x(:,1);
+x0  = vehicle.control_cvx.x0;
 x0(vehicle.sysdthetaIndex) = vehicle.theta;
 x0(vehicle.sysdqIndex) = vehicle.q;
 x0(vehicle.sysduIndex) = vehicle.u;
@@ -49,7 +49,7 @@ if(~isfield(vehicle.control_cvx,'H'))
     Qxf = C'*Qyfinal*C;
 
     
-    QSR = repmat({[Qx Qxu ; Qxu' Qu]},1,N-1);
+    QSR = repmat({[Qx Qxu ; Qxu' Qu]},1,T-1);
     
     vehicle.control_cvx.H = blkdiag(Qu,QSR{:},Qxf);
     vehicle.control_cvx.Qxu = Qxu;
@@ -104,7 +104,7 @@ if(~isfield(vehicle.control_cvx,'H'))
 %               Algorithm: [ active-set | interior-point | interior-point-convex | levenberg-marquardt | ...
 %                            sqp | trust-region-dogleg | trust-region-reflective ]
 
-    vehicle.control_cvx.usol = zeros(m*N,1);
+    vehicle.control_cvx.usol = zeros(m*T,1);
     vehicle.control_cvx.iter = 0;
     vehicle.control_cvx.numSol = 0;
     vehicle.control_cvx.deltaT = 0;
@@ -120,7 +120,7 @@ if( 1 || vehicle.control_cvx.iter == 2 || (~vehicle.control_cvx.solved))
     w(vehicle.sysdthetaIndex) = wdelta(1);
     w(vehicle.sysdqIndex) = wdelta(2);
     
-    b = [vehicle.sysd.A*x0 + w; repmat(w, N-1,1); w];
+    b = [vehicle.sysd.A*x0 + w; repmat(w, T-1,1); w];
     
     
     ydesired = Ftarget; %q = 0 [Fx,Fz] = Ftarget
@@ -144,21 +144,18 @@ if( 1 || vehicle.control_cvx.iter == 2 || (~vehicle.control_cvx.solved))
     vehicle.control_cvx.problem.x0 = vehicle.control_cvx.usol;
     vehicle.control_cvx.problem.Beq = b;
     
-    [z, J, exitFlag]  = quadprog(vehicle.control_cvx.problem);
+    [z, ~, ~]  = quadprog(vehicle.control_cvx.problem);
     vehicle.control_cvx.deltaT = vehicle.control_cvx.deltaT + toc(tstart);
     vehicle.control_cvx.numSol = vehicle.control_cvx.numSol + 1;
 
     u_x = reshape(z,n+m,T);
-    u = u_x(1:m,:);
-    x = u_x(m+1:end,:);
+    usol = u_x(1:m,:);
+    xsol = u_x(m+1:end,:);
     
     
-    vehicle.control_cvx.usol = z;
-    vehicle.control_cvx.u = u;
-    
-    vehicle.control_cvx.Uff = vehicle.control_cvx.u;
-    vehicle.control_cvx.x = x;
-    vehicle.control_cvx.F = C* vehicle.control_cvx.x + D * vehicle.control_cvx.u;
+    vehicle.control_cvx.usol = usol;
+    vehicle.control_cvx.xsol = xsol;
+    vehicle.control_cvx.F = C* vehicle.control_cvx.xsol + D * vehicle.control_cvx.usol;
     vehicle.control_cvx.Ftarget = Ftarget_in;
 
     vehicle.control_cvx.iter = 0;
@@ -167,8 +164,9 @@ end
 
 
 vehicle.control_cvx.iter = vehicle.control_cvx.iter + 1;
-if(vehicle.control_cvx.iter < size(vehicle.control_cvx.Uff,2))
-    vehicle.U = vehicle.control_cvx.Uff(:,vehicle.control_cvx.iter);
+if(vehicle.control_cvx.iter < size(vehicle.control_cvx.usol,2))
+    vehicle.U = vehicle.control_cvx.usol(:,vehicle.control_cvx.iter);
+    vehicle.control_cvx.x0 = vehicle.sysd.a *  x0  +  vehicle.sysd.b * vehicle.U;
 end
 
 end

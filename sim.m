@@ -1,4 +1,4 @@
-ctrl = {'lqru', 'pid', 'mpc', 'mpc2', 'quadprog'};
+ctrl = {'lqru', 'pid', 'mpc', 'mpc2', 'quadprog', 'fastmpc'};
 
 %controller_type = 'lqru';
 %controller_type = 'pid'; 
@@ -24,7 +24,7 @@ uTarget = 2;
 
 
 
-Tmax = 3;
+Tmax = 1;
 t = 0:vehicle.dt:Tmax;
 n = length(t);
 U = zeros(4,n);
@@ -56,6 +56,11 @@ for i = 1:n-1
     end
     Fhist(:,i) = Ftarget;
     switch controller_type
+        case 'fastmpc'
+            vehicle = control_fastmpc(vehicle,Ftarget);
+            Mycmd(:,i) = 0;
+            thetaCmd(:,i) = 0;
+            
         case 'quadprog'
             vehicle = control_quadprog(vehicle,Ftarget);
             Mycmd(:,i) = 0;
