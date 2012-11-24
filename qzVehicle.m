@@ -37,30 +37,31 @@ Glcm = ss(vehicle.lcm,'InputName',{'t1','t2','t3','t4'}, ...
 %Motor dynamics:
 M_omega1 = 22/1.4;
 M_omega2 = 60*2*pi;
-motor_dynamics = tf(1/( (s/M_omega1) + 1) /( (s/M_omega2) + 1));
+FM_dynamics = tf(1/( (s/M_omega1) + 1));% /( (s/M_omega2) + 1));
 %motor_dynamics = tf(1);
-motor_dynamics = ss(motor_dynamics);
+FM_dynamics = ss(FM_dynamics);
 z = tf('z',.01);
-motor_dynamics = c2d(motor_dynamics,.01); %.02 time delay;
-motor_dynamics.InputName = {'My_{cmd}'};
-motor_dynamics.OutputName = {'My'};
+FM_dynamics = c2d(FM_dynamics,.01); %.02 time delay;
+FM_dynamics = append(FM_dynamics,FM_dynamics);
+FM_dynamics.InputName = {'My_{cmd}','Fz_{cmd}'};
+FM_dynamics.OutputName = {'My','Fz'};
 
-vehicle.actD.sysd = connect(motor_dynamics, Glcm, Glcm.InputName, [motor_dynamics.OutputName,{'Fz_{cmd}'}]);
+vehicle.actD.sysd = connect(FM_dynamics, Glcm, Glcm.InputName, FM_dynamics.OutputName);
 vehicle.actD.tstates = zeros(size(vehicle.actD.sysd.a,1),1);
 
-vehicle.sysd = connect(vehicle.actD.sysd,vehicle.sysd,vehicle.actD.sysd.InputName, {'Fx','Fz_{cmd}'});
+vehicle.sysd = connect(vehicle.actD.sysd,vehicle.sysd,vehicle.actD.sysd.InputName, {'Fx','Fz'});
 
-%converge the actuator to trim state initially!
 vehicle.sysdthetaIndex = find(strcmp(vehicle.sysd.StateName,'\theta'));
 vehicle.sysdqIndex = find(strcmp(vehicle.sysd.StateName,'q'));
 vehicle.sysduIndex = find(strcmp(vehicle.sysd.StateName,'u'));
 
-                    
-             
-                    
+
+%%
+%Sim dynamics
+
 vehicle.sysSim = connect(Gy,Gz,Glcm, [Glcm.InputName; 'My_{dist}'; 'u_{wind}'],[Gy.OutputName; Gz.OutputName]); 
 vehicle.sysSim = c2d(vehicle.sysSim,vehicle.dt);
-vehicle.xsim = 0 * zeros(size(vehicle.sysSim.a,1),1);
+vehicle.xsim = zeros(size(vehicle.sysSim.a,1),1);
 
 vehicle.thetaIndex = find(strcmp(vehicle.sysSim.OutputName,'\theta'));
 vehicle.qIndex = find(strcmp(vehicle.sysSim.OutputName,'q_{INS}'));

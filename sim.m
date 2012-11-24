@@ -104,6 +104,7 @@ if(isfield(vehicle.control_cvx,'numSol'))
     deltaT_persolve =   vehicle.control_cvx.deltaT/vehicle.control_cvx.numSol;
 else
     numSol = 0;
+    deltaT_persolve = 0;
 end
 fprintf(1,'runttime was %f (total solves = %i , per solve = %3.0fms) \n', deltaT, numSol, deltaT_persolve*1000);
 

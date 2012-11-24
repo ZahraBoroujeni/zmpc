@@ -10,6 +10,7 @@ n = size(vehicle.sysd.a,1);
 
 if(~isfield(vehicle.control_cvx,'x'));
     vehicle.control_cvx.x  = zeros(n,1);
+    vehicle.control_cvx.x(2) = -vehicle.weight/vehicle.sysd.c(2,2);
 end
 
 x0  = vehicle.control_cvx.x(:,1);
@@ -29,9 +30,9 @@ Qy = diag([5 ; 50]);
 Qyfinal = diag([5; 50]);
 r =  1;
 R = diag(r*ones(m,1));
-C = vehicle.sysd.C; 
-
-D = vehicle.sysd.D*cos(vehicle.theta);
+C = vehicle.sysd.C;
+C(2,:) = C(2,:) / cos(vehicle.theta);
+D = vehicle.sysd.D;
 
     
 if(~isfield(vehicle.control_cvx,'H'))
