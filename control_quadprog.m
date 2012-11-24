@@ -1,4 +1,4 @@
-function vehicle = control_fastmpc(vehicle, Ftarget_in)
+function vehicle = control_quadprog(vehicle, Ftarget_in)
 
 %x = Ax * Bu where x = [theta, theta_dot]
 %y = [Fx; delta_Fz] = [-W*theta ; ]
@@ -123,7 +123,7 @@ if( 1 || vehicle.control_cvx.iter == 2 || (~vehicle.control_cvx.solved))
     b = [vehicle.sysd.A*x0 + w; repmat(w, N-1,1); w];
     
     
-    ydesired = [Ftarget]; %q = 0 [Fx,Fz] = Ftarget
+    ydesired = Ftarget; %q = 0 [Fx,Fz] = Ftarget
     cx = -2*C'*Qy * ydesired;
     cxf = -2*C'*Qyfinal* ydesired;
     cu = -2*D'*Qy * ydesired;

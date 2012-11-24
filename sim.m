@@ -1,4 +1,4 @@
-ctrl = {'lqru', 'pid', 'mpc', 'mpc2', 'fastmpc'};
+ctrl = {'lqru', 'pid', 'mpc', 'mpc2', 'quadprog'};
 
 %controller_type = 'lqru';
 %controller_type = 'pid'; 
@@ -56,8 +56,8 @@ for i = 1:n-1
     end
     Fhist(:,i) = Ftarget;
     switch controller_type
-        case 'fastmpc'
-            vehicle = control_fastmpc(vehicle,Ftarget);
+        case 'quadprog'
+            vehicle = control_quadprog(vehicle,Ftarget);
             Mycmd(:,i) = 0;
             thetaCmd(:,i) = 0;
             
