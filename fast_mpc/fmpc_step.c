@@ -310,9 +310,79 @@ void fmpcsolve(double *A, double *B, double *At, double *Bt, double *eyen,
         rdrp(A,B,Q,R,Qf,z,nu,gf,gp,b,T,n,m,nz,kappa,rd,rp,Ctnu);
         resdresp(rd,rp,T,n,nz,&resd,&resp,&res);
 
-        if (res < tol) break;
+//        printf("gf_mpc = [\n");
+//        printmat(gf,nz,1);
+//        printf("];\n");
 
-        dnudz(A,B,At,Bt,eyen,eyem,Q,R,Qf,hp,rd,rp,T,n,m,nz,kappa,dnu,dz); 
+//        printf("gp_mpc = [\n");
+//        printmat(gp,nz,1);
+//        printf("];\n");
+
+//        printf("hp_mpc = [\n");
+//        printmat(hp, nz, 1);
+//        printf("];\n");
+
+        if (res < tol) break;
+        dnudz(A,B,At,Bt,eyen,eyem,Q,R,Qf,hp,rd,rp,T,n,m,nz,kappa,dnu,dz);
+
+//        printf("kappa_mpc = %g;\n",kappa);
+//        printf("A_mpc = [\n");
+//        printmat(A,n,n);
+//        printf("];\n");
+//
+//        printf("At_mpc = [\n");
+//        printmat(At,n,n);
+//        printf("];\n");
+//
+//        printf("B_mpc = [\n");
+//        printmat(B,n,m);
+//        printf("];\n");
+//
+//        printf("Bt_mpc = [\n");
+//        printmat(Bt,m,n);
+//        printf("];\n");
+//
+//        printf("eyen_mpc = [\n");
+//        printmat(eyen,n,n);
+//        printf("];\n");
+//
+//        printf("eyem_mpc = [\n");
+//        printmat(eyem,m,m);
+//        printf("];\n");
+//
+//        printf("Q_mpc = [\n");
+//        printmat(Q,n,n);
+//        printf("];\n");
+//
+//        printf("Qf_mpc = [\n");
+//        printmat(Qf,n,n);
+//        printf("];\n");
+//
+//        printf("R_mpc = [\n");
+//        printmat(R,m,m);
+//        printf("];\n");
+//
+//
+//
+//
+//        printf("rd_mpc = [\n");
+//        printmat(rd, nz, 1);
+//        printf("];\n");
+//
+//        printf("rp_mpc = [\n");
+//        printmat(rp, T*n, 1);
+//        printf("];\n");
+//
+//
+//                printf("dz_mpc = [\n");
+//                printmat(dz, nz, 1);
+//                printf("];\n");
+//
+//                printf("dnu_mpc = [\n");
+//                printmat(dnu, 500, 1);
+//                printf("];\n");
+
+
 
         s = 1; 
         /* feasibility search */
@@ -330,7 +400,7 @@ void fmpcsolve(double *A, double *B, double *At, double *Bt, double *eyen,
             {
             	if(s<0.01)
             	{
-            		printf("s = %g for z[%i]=%g is infeasible !\n",s,i-1,dz[i-1]);
+//            		printf("s = %g for z[%i]=%g is infeasible !\n",s,i-1,dz[i-1]);
 
             		s = 0;
             		break;
@@ -361,16 +431,16 @@ void fmpcsolve(double *A, double *B, double *At, double *Bt, double *eyen,
             gfgphp(Q,R,Qf,g,zmax,zmin,newz,T,n,m,nz,newgf,newgp,newhp);
             rdrp(A,B,Q,R,Qf,newz,newnu,newgf,newgp,b,T,n,m,nz,kappa,newrd,newrp,newCtnu);
             resdresp(newrd,newrp,T,n,nz,&newresd,&newresp,&newres);
-            if (newres <= (1-alpha*s)*res)
+            if (newres <= (1-alpha*s)*res || (s == 0))
             	break;
             else if(s<1e-3)
             {
             	s = 0;
-            	printf("s is too small!!\n");
+//            	printf("s is too small!!\n");
             }
             else
             {
-            	printf("s = %g, newres = %g , oldres = %g\n",s, newres, res);
+//            	printf("s = %g, newres = %g , oldres = %g\n",s, newres, res);
             }
             s = beta*s;
             dptr = newnu; dptr1 = nu; dptr2 = dnu;
@@ -899,14 +969,14 @@ void gfgphp(double *Q, double *R, double *Qf, double * g, double *zmax, double *
     dptr = gf; dptr1 = z; 
     for (i = 0; i < T-1; i++)
     {
-        F77_CALL(dgemv)("n",&m,&m,&ftwo,R,&m,dptr1,&ione,&fzero,dptr,&ione);
+        F77_CALL(dgemv)("n",&m,&m,&ftwo,R,&m,dptr1,&ione,&fone,dptr,&ione);
         dptr = dptr+m; dptr1 = dptr1+m;
-        F77_CALL(dgemv)("n",&n,&n,&ftwo,Q,&n,dptr1,&ione,&fzero,dptr,&ione);
+        F77_CALL(dgemv)("n",&n,&n,&ftwo,Q,&n,dptr1,&ione,&fone,dptr,&ione);
         dptr = dptr+n; dptr1 = dptr1+n;
     }
-    F77_CALL(dgemv)("n",&m,&m,&ftwo,R,&m,dptr1,&ione,&fzero,dptr,&ione);
+    F77_CALL(dgemv)("n",&m,&m,&ftwo,R,&m,dptr1,&ione,&fone,dptr,&ione);
     dptr = dptr+m; dptr1 = dptr1+m;
-    F77_CALL(dgemv)("n",&n,&n,&ftwo,Qf,&n,dptr1,&ione,&fzero,dptr,&ione);
+    F77_CALL(dgemv)("n",&n,&n,&ftwo,Qf,&n,dptr1,&ione,&fone,dptr,&ione);
 
     free(gp1); free(gp2);
     return;

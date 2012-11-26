@@ -17,7 +17,7 @@ vehicle.FM = [0 ; 0 ; 0];
 vehicle.U = zeros(4,1);
 
 
-plantReduce(Gy,{'u','\theta','q'},'My_{cmd}',{'\theta','q_{INS}'});
+plantReduce(Gy,{'u','\theta','q'},{'My_{cmd}'},{'\theta','q_{INS}'});
 vehicle.A =  Gy_reduced.a;
 vehicle.B = [0; 1/vehicle.Iyy; 0];
 vehicle.C = [-vehicle.weight, 0, 0];
@@ -72,7 +72,7 @@ vehicle.Fzindex = find(strcmp(vehicle.sysSim.OutputName,'Fz'));
 
 
 vehicle.Fzdist = 0 ;
-vehicle.Mydist = 0 ;
+vehicle.Mydist = 1 ;
 vehicle.uwind = 0;
 
 
@@ -129,5 +129,5 @@ vehicle.estimator_dist.Cxd = [eye(3) , zeros(3,1)];
 vehicle.estimator_dist.Lxd = -[1 0 0; 
                               0 1 0;
                               0 0 0;
-                              0 0 0];
+                              0 5 0];
 

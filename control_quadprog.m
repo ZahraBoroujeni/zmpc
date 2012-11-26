@@ -11,6 +11,8 @@ m = size(vehicle.sysd.b,2);
 if(~isfield(vehicle.control_cvx,'x0'));
     vehicle.control_cvx.x0  = zeros(n,1);
     vehicle.control_cvx.x0(2) = -vehicle.weight/vehicle.sysd.c(2,2);
+    vehicle.control_cvx.thetacmd = 0;
+    vehicle.control_cvx.cmd_rate = 0;
 end
 
 x0  = vehicle.control_cvx.x0;
@@ -21,9 +23,23 @@ x0(vehicle.sysduIndex) = vehicle.u;
 
 
 Ftarget = Ftarget_in;
-theta_Fx = asind(Ftarget(1)/vehicle.weight);
-theta_Fx = max(min(theta_Fx,15),-15);
-Ftarget(1) = sind(theta_Fx)*vehicle.weight;
+
+wn = 18;
+zeta = 1;
+thetacmd = -asin(Ftarget(1)/vehicle.weight);
+thetamax = 15*pi/180;
+thetacmd = max(min(thetacmd , thetamax),-thetamax);
+cmd_accel = wn^2 * (thetacmd - vehicle.control_cvx.thetacmd)...
+             - 2.0 * zeta * wn *vehicle.control_cvx.cmd_rate ;
+         
+vehicle.control_cvx.cmd_rate = vehicle.control_cvx.cmd_rate + ...
+              cmd_accel * vehicle.dt;
+vehicle.control_cvx.cmd_rate = clip(vehicle.control_cvx.cmd_rate,-vehicle.control_pid.slewrate, vehicle.control_pid.slewrate);           
+          
+vehicle.control_cvx.thetacmd = vehicle.control_cvx.thetacmd + ...
+    vehicle.control_cvx.cmd_rate * vehicle.dt;
+
+Ftarget(1) = -sin(vehicle.control_cvx.thetacmd)*vehicle.weight;
 
 
 Qy = diag([5 ; 50]);

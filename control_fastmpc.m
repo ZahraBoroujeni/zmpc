@@ -11,6 +11,8 @@ m = size(vehicle.sysd.b,2);
 if(~isfield(vehicle.control_cvx,'x0'));
     vehicle.control_cvx.x0  = zeros(n,1);
     vehicle.control_cvx.x0(2) = -vehicle.weight/vehicle.sysd.c(2,2);
+    vehicle.control_cvx.thetacmd = 0;
+    vehicle.control_cvx.cmd_rate = 0;
 end
 %overwrite it with the current measured values
 x0  = vehicle.control_cvx.x0;
@@ -24,7 +26,7 @@ Qyf = diag([5; 50]);
 r =  1;
 R = diag(r*ones(m,1));
 C = vehicle.sysd.C;
-C(2,:) = C(2,:) / cos(vehicle.theta);
+C(2,:) = C(2,:) * cos(vehicle.theta);
 D = vehicle.sysd.D;
 
     
@@ -34,6 +36,7 @@ if(~isfield(vehicle.control_cvx,'usol'))
     vehicle.control_cvx.iter = 0;
     vehicle.control_cvx.numSol = 0;
     vehicle.control_cvx.deltaT = 0;
+    vehicle.control_cvx.dtHist = [];
     vehicle.control_cvx.solved = false;
 else
    
@@ -44,7 +47,7 @@ else
 end
 
 
-if( 0 || (~vehicle.control_cvx.solved))
+if( 1 || (~vehicle.control_cvx.solved))
 
     
     %compute the noise
@@ -56,23 +59,39 @@ if( 0 || (~vehicle.control_cvx.solved))
     
     %compute the desired y
     Ftarget = Ftarget_in;
-    theta_Fx = asind(Ftarget(1)/vehicle.weight);
-    theta_Fx = max(min(theta_Fx,15),-15);
-    Ftarget(1) = sind(theta_Fx)*vehicle.weight;    
+    wn = 18;
+    zeta = 1;
+    thetacmd = -asin(Ftarget(1)/vehicle.weight);
+    thetamax = 15*pi/180;
+    thetacmd = max(min(thetacmd , thetamax),-thetamax);
+    cmd_accel = wn^2 * (thetacmd - vehicle.control_cvx.thetacmd)...
+        - 2.0 * zeta * wn *vehicle.control_cvx.cmd_rate ;
+    vehicle.control_cvx.cmd_rate = vehicle.control_cvx.cmd_rate + ...
+        cmd_accel * vehicle.dt;
+    vehicle.control_cvx.cmd_rate = clip(vehicle.control_cvx.cmd_rate,-vehicle.control_pid.slewrate, vehicle.control_pid.slewrate);
+    
+    vehicle.control_cvx.thetacmd = vehicle.control_cvx.thetacmd + ...
+        vehicle.control_cvx.cmd_rate * vehicle.dt;
+    
+    Ftarget(1) = -sin(vehicle.control_cvx.thetacmd)*vehicle.weight;
+
     ydesired = Ftarget;
+    
     
     
 %    function [U, X] = fastmpcsolve(A,B,C,D,Qy,Qyf,R, yd, w, x0, X0, U0, ubounds, xbounds)
     tstart = tic;
 
     [U, X] = fastmpcsolve(vehicle.sysd.a, vehicle.sysd.b, C, D, ...
-                          Qy, Qyf, 0*R, T,...
+                          Qy, Qyf, R, T,...
                           ydesired, w, x0,...
                           vehicle.control_cvx.usol, vehicle.control_cvx.xsol, ...
                           [vehicle.tmin, vehicle.tmax], []);
                       
     
-    vehicle.control_cvx.deltaT = vehicle.control_cvx.deltaT + toc(tstart);
+    dt = toc(tstart);
+    vehicle.control_cvx.dtHist = [    vehicle.control_cvx.dtHist ; dt];
+    vehicle.control_cvx.deltaT = vehicle.control_cvx.deltaT +dt ;
     vehicle.control_cvx.numSol = vehicle.control_cvx.numSol + 1;
     
     vehicle.control_cvx.usol = U;

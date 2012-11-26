@@ -5,7 +5,7 @@ ctrl = {'lqru', 'pid', 'mpc', 'mpc2', 'quadprog', 'fastmpc'};
 %controller_type = 'mpc'; 
 
 
-for ctrl_idx = 6 %[2, 5]
+for ctrl_idx = [2,5, 6]
     
 controller_type = ctrl{ctrl_idx};
 
@@ -18,7 +18,7 @@ cvx_quiet(true);
 %target Fx Fz
 %Ftarget = [15; -1.2*vehicle.weight];
 Ftarget = [3; -1*vehicle.weight];
-uLoop = false;
+uLoop = true;
 uTarget = 2;
 
 
